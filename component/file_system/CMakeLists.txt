@@ -1,0 +1,7 @@
+if(CONFIG_CORE_AS_AP OR CONFIG_WHC_DUAL_TCPIP OR CONFIG_WHC_WPA_SUPPLICANT_OFFLOAD)
+    ameba_add_subdirectory(fatfs)
+    ameba_add_subdirectory(littlefs)
+    ameba_add_subdirectory(kv)
+    ameba_add_subdirectory(vfs)
+endif()
+ameba_add_subdirectory_if(CONFIG_BT ftl)

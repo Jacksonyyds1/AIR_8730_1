@@ -1,0 +1,51 @@
+{
+  "Images": [
+    {
+      "ImagePath": "D:\\RealTek_8730EA_project\\8730_SDK\\ameba-rtos\\amebasmart_gcc_project\\km4_boot_all.bin",
+      "Enabled": true
+    },
+    {
+      "ImagePath": "D:\\RealTek_8730EA_project\\8730_SDK\\ameba-rtos\\amebasmart_gcc_project\\km0_km4_ca32_app.bin",
+      "Enabled": true
+    }
+  ],
+  "Encryption": {
+    "Mode": "RDP",
+    "RdpKey": "00000000000000000000000000000000",
+    "RsipKey": "00000000000000000000000000000000",
+    "RsipIv": "00000000000000000000000000000000"
+  },
+  "Profile": "D:\\RealTek_8730EA_project\\8730_SDK\\ameba-rtos\\tools\\ameba\\ImageTool\\Devices\\Profiles\\AmebaSmart_FreeRTOS_NOR.rdev",
+  "SerialPort": "Prolific PL2303GC USB Serial COM Port (COM19)",
+  "Baudrate": 1500000,
+  "RamDownloadPaddingByte": 0,
+  "SensePacketCount": 32,
+  "ProgramConfig1": 0,
+  "ProgramConfig2": 0,
+  "PostProcess": "None",
+  "AutoSwitchToDownloadModeWithDtrRts": 0,
+  "AutoSwitchToUsbInterface": 1,
+  "SpicAddrMode": 0,
+  "ExpertMode": 0,
+  "SkipFloader": 0,
+  "SwitchBaudrateAtFloader": 0,
+  "DisableNandAccessWithUart": 0,
+  "ReservedPartitions": 4,
+  "FlashProtectionProcess": 0,
+  "EraseByBlock": 0,
+  "LogLevel": "Info",
+  "LogFlushIntervalInMillisecond": 100,
+  "DisableLogTimestamp": 0,
+  "EnableVerboseLog": 0,
+  "BaudrateSwitchDelayInMillisecond": 200,
+  "RomBootDelayInMillisecond": 100,
+  "UsbRomBootDelayInMillisecond": 500,
+  "FloaderBootDelayInMillisecond": 100,
+  "UsbFloaderBootDelayInMillisecond": 500,
+  "AsyncResponseTimeoutInMillisecond": 1000,
+  "SyncResponseTimeoutInMillisecond": 1000,
+  "WriteResponseTimeoutInMillisecond": 2000,
+  "RequestRetryIntervalInMillisecond": 1,
+  "RequestRetryCount": 3,
+  "ResponseRetryCount": 3
+}

@@ -1,0 +1,16 @@
+{
+  "ChipType": "Ameba1",
+  "CoreGroup": "None",
+  "LineConunts": 1100,
+  "ShowTimeStamp": true,
+  "COMInformation": "COM19: Prolific PL2303GC USB Serial COM Port ",
+  "Baudrate": 1500000,
+  "EncodingType": "ASCII",
+  "DataBits": 8,
+  "ParityValue": "None",
+  "StopBitsValue": "One",
+  "TimeIntervalInMS": 1000,
+  "SocketPortBT": 5000,
+  "SocketPortBTFW": 5001,
+  "LogSizeLimitedInKB": 0
+}

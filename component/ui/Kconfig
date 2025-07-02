@@ -1,0 +1,4 @@
+menu "Graphics Libraries Configuration"
+    rsource "LVGL/Kconfig"
+    rsource "third_party/Kconfig"
+endmenu
