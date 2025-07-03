@@ -1,12 +1,16 @@
 {
   "Images": [
     {
-      "ImagePath": "D:\\RealTek_8730EA_project\\8730_SDK\\ameba-rtos\\amebasmart_gcc_project\\km4_boot_all.bin",
+      "ImagePath": "D:\\RealTek_8730EA_project\\8730_SDK\\ameba-rtos\\amebadplus_gcc_project\\km4_boot_all.bin",
       "Enabled": true
     },
     {
-      "ImagePath": "D:\\RealTek_8730EA_project\\8730_SDK\\ameba-rtos\\amebasmart_gcc_project\\km0_km4_ca32_app.bin",
+      "ImagePath": "D:\\RealTek_8730EA_project\\8730_SDK\\ameba-rtos\\amebadplus_gcc_project\\km0_km4_app.bin",
       "Enabled": true
+    },
+    {
+      "ImagePath": "km0_km4_app_mp.bin",
+      "Enabled": false
     }
   ],
   "Encryption": {
@@ -15,8 +19,8 @@
     "RsipKey": "00000000000000000000000000000000",
     "RsipIv": "00000000000000000000000000000000"
   },
-  "Profile": "D:\\RealTek_8730EA_project\\8730_SDK\\ameba-rtos\\tools\\ameba\\ImageTool\\Devices\\Profiles\\AmebaSmart_FreeRTOS_NOR.rdev",
-  "SerialPort": "Prolific PL2303GC USB Serial COM Port (COM19)",
+  "Profile": "D:\\RealTek_8730EA_project\\8730_SDK\\ameba-rtos\\tools\\ameba\\ImageTool\\Devices\\Profiles\\AmebaDplus_FreeRTOS_NOR.rdev",
+  "SerialPort": "Prolific PL2303GC USB Serial COM Port (COM9)",
   "Baudrate": 1500000,
   "RamDownloadPaddingByte": 0,
   "SensePacketCount": 32,
