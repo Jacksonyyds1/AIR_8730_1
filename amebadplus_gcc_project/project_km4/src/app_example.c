@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include "main.h"
 #include "TimeEvent.h"
+#include "Lcd.h"
 
 /*===================================  Types ================================*/
 typedef struct {
@@ -353,5 +354,6 @@ void start_timer_event_system(void)
 void app_example(void)
 {
     printf("hello world\n");
-    start_timer_event_system();
+    DisplayLCD_Init();
+    //start_timer_event_system();
 }
