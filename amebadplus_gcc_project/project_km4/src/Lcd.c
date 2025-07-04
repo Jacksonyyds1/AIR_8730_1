@@ -12,15 +12,14 @@ static GDMA_InitTypeDef GDMA_InitStruct;
 
 // LCD控制引脚宏定义 - 需要根据实际硬件连接修改
 #define LCD_RES_PIN         _PA_12
-#define LCD_DC_PIN          _PA_13  
-#define LCD_CS_PIN          _PA_14
-#define LCD_BL_PIN          _PA_15
+#define LCD_DC_PIN          _PA_22  
+
 
 // SPI引脚定义 - 需要根据实际硬件连接修改
 #define SPI_MOSI_PIN        _PA_23
-#define SPI_MISO_PIN        _PA_22
-#define SPI_SCLK_PIN        _PA_18
-#define SPI_CS_PIN          _PA_19
+#define SPI_MISO_PIN        _PA_20
+#define SPI_SCLK_PIN        _PA_30
+#define SPI_CS_PIN          _PA_21
 
 // LCD尺寸定义
 #define LCD_W               80
@@ -52,7 +51,7 @@ static volatile u32 DMA_Complete_Flag = 0;
 static u32 LCD_DMA_Callback(void *para)
 {
     UNUSED(para);
-    
+
     u32 IsrTypeMap = 0;
     
     // 清除中断标志
@@ -78,14 +77,14 @@ static void LCD_GPIO_Init(void)
     gpio_mode(&lcd_dc_gpio, PullUp);
     
     // 初始化片选引脚
-    gpio_init(&lcd_cs_gpio, LCD_CS_PIN);
+    gpio_init(&lcd_cs_gpio, SPI_CS_PIN);
     gpio_dir(&lcd_cs_gpio, PIN_OUTPUT);
     gpio_mode(&lcd_cs_gpio, PullUp);
     
     // 初始化背光引脚
-    gpio_init(&lcd_bl_gpio, LCD_BL_PIN);
+/*     gpio_init(&lcd_bl_gpio, LCD_BL_PIN);
     gpio_dir(&lcd_bl_gpio, PIN_OUTPUT);
-    gpio_mode(&lcd_bl_gpio, PullUp);
+    gpio_mode(&lcd_bl_gpio, PullUp); */
     
     // 初始化状态
     LCD_CS_Set();
