@@ -43,6 +43,7 @@ ameba_list_append(private_sources
          multi_button.c
          TimeEvent.c
          step_motor.c
+         Lcd.c
          )
 
 # Component private part, user config end
