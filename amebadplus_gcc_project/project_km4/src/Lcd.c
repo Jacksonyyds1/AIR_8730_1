@@ -100,6 +100,8 @@ static void LCD_SPI_Init(void)
     spi_init(&spi_master, SPI_MOSI_PIN, SPI_MISO_PIN, SPI_SCLK_PIN, SPI_CS_PIN);
     spi_format(&spi_master, 8, 0, 0);  // 8位数据，模式0
     spi_frequency(&spi_master, 10000000);  // 10MHz
+    printf("SPI initialized with MOSI: %d, MISO: %d, SCLK: %d, CS: %d\n",
+           SPI_MOSI_PIN, SPI_MISO_PIN, SPI_SCLK_PIN, SPI_CS_PIN);
 }
 
 // DMA初始化
@@ -264,6 +266,8 @@ void DisplayLCD_Init(void)
     // 初始化GPIO
     LCD_GPIO_Init();
     
+    spi_master.spi_idx = MBED_SPI1;
+
     // 初始化SPI
     LCD_SPI_Init();
     
@@ -392,7 +396,7 @@ void DisplayLCD_Init(void)
     DelayMs(100);
     
     // 填充黑色
-    LCD_Fill_FixedColor_Simple(0, LCD_W-1, 0, LCD_H-1, BLACK);
+    LCD_Fill_FixedColor_Simple(0, LCD_W-1, 0, LCD_H-1, RED);
 }
 
 // 显示全屏图片
