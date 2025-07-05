@@ -10,6 +10,7 @@ extern "C" {
 #include "gpio_api.h"
 #include "os_wrapper.h"
 #include <stdbool.h>
+#include "platform_autoconf.h" 
 
 // --- 步进电机定义 ---
 #define MOTOR_TIMER_FREQ    40000000    // RTL8721DCM定时器频率 40MHz

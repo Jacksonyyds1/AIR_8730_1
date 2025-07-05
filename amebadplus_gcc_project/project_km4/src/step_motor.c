@@ -1,4 +1,6 @@
 #include "step_motor.h"
+#include "platform_autoconf.h"
+
 
 // --- 步进电机结构体定义 ---
 typedef struct {
@@ -69,17 +71,35 @@ static void timer_base_handler(void);
 // --- GPIO初始化 ---
 void stepper_motor_gpio_init(void)
 {
-    // MOTOR_NOZZLE GPIO初始化
+
+        // 先将引脚配置为GPIO功能，取消SPI功能
+    printf("GPIO init: Configuring pins as GPIO...\n");
+    
+    // MOTOR_NOZZLE 引脚
+ /*    Pinmux_Config(MOTOR_NOZZLE_A_PLUS, PINMUX_FUNCTION_GPIO);
+    Pinmux_Config(MOTOR_NOZZLE_B_PLUS, PINMUX_FUNCTION_GPIO);
+    Pinmux_Config(MOTOR_NOZZLE_A_MINUS, PINMUX_FUNCTION_GPIO);
+    Pinmux_Config(MOTOR_NOZZLE_B_MINUS, PINMUX_FUNCTION_GPIO); */
+    
+    // MOTOR_BASE 引脚
+    Pinmux_Config(MOTOR_BASE_A_PLUS, PINMUX_FUNCTION_GPIO);
+    Pinmux_Config(MOTOR_BASE_B_PLUS, PINMUX_FUNCTION_GPIO);
+    Pinmux_Config(MOTOR_BASE_A_MINUS, PINMUX_FUNCTION_GPIO);
+    Pinmux_Config(MOTOR_BASE_B_MINUS, PINMUX_FUNCTION_GPIO);
+
+     printf("GPIO init: Pins configured as GPIO\n");
+
+/*     // MOTOR_NOZZLE GPIO初始化
     gpio_init(&motor_gpio[MOTOR_NOZZLE][0], MOTOR_NOZZLE_A_PLUS);
     gpio_init(&motor_gpio[MOTOR_NOZZLE][1], MOTOR_NOZZLE_B_PLUS);
     gpio_init(&motor_gpio[MOTOR_NOZZLE][2], MOTOR_NOZZLE_A_MINUS);
-    gpio_init(&motor_gpio[MOTOR_NOZZLE][3], MOTOR_NOZZLE_B_MINUS);
+    gpio_init(&motor_gpio[MOTOR_NOZZLE][3], MOTOR_NOZZLE_B_MINUS); */
     
-    for(int i = 0; i < 4; i++) {
+ /*    for(int i = 0; i < 4; i++) {
         gpio_dir(&motor_gpio[MOTOR_NOZZLE][i], PIN_OUTPUT);
         gpio_mode(&motor_gpio[MOTOR_NOZZLE][i], PullNone);
         gpio_write(&motor_gpio[MOTOR_NOZZLE][i], 0);
-    }
+    } */
     
     // MOTOR_BASE GPIO初始化
     gpio_init(&motor_gpio[MOTOR_BASE][0], MOTOR_BASE_A_PLUS);
@@ -92,16 +112,29 @@ void stepper_motor_gpio_init(void)
         gpio_mode(&motor_gpio[MOTOR_BASE][i], PullNone);
         gpio_write(&motor_gpio[MOTOR_BASE][i], 0);
     }
+     printf("GPIO init: Completed successfully\n");
 }
 
 // --- 定时器初始化 ---
 void stepper_motor_timer_init(void)
 {
+    printf("Timer init: Enabling timer clocks...\n");
+    
+    // 先启用定时器时钟 - TIMER2 和 TIMER3
+    //RCC_PeriphClockCmd(APBPeriph_TIMx[2], APBPeriph_TIMx_CLOCK[2], ENABLE);  // TIMER2
+    RCC_PeriphClockCmd(APBPeriph_TIMx[3], APBPeriph_TIMx_CLOCK[3], ENABLE);  // TIMER3
+    
+    printf("Timer init: Clocks enabled, initializing timers...\n");
+    
     // 初始化MOTOR_NOZZLE定时器
-    gtimer_init(&motor_timer[MOTOR_NOZZLE], MOTOR_TIMER_NOZZLE);
+/*     gtimer_init(&motor_timer[MOTOR_NOZZLE], MOTOR_TIMER_NOZZLE);
+    printf("Timer init: MOTOR_NOZZLE timer initialized\n"); */
     
     // 初始化MOTOR_BASE定时器  
     gtimer_init(&motor_timer[MOTOR_BASE], MOTOR_TIMER_BASE);
+    printf("Timer init: MOTOR_BASE timer initialized\n");
+    
+    printf("Timer init completed successfully\n");
 }
 
 // --- 定时器启动函数 ---
@@ -110,7 +143,7 @@ static void stepper_motor_start_timer(uint8_t index)
     if(index >= MOTOR_COUNT) return;
     
     // 计算定时器周期 (单位: 微秒)
-    uint32_t period_us = (STEP_TICKS_MAX - stepper_motor[index].current_speed) * 25; // 25us基准
+    uint32_t period_us = (STEP_TICKS_MAX - stepper_motor[index].current_speed) ; // 25us基准
     if(period_us < 100) period_us = 100; // 最小100us，避免过快
     
     if(index == MOTOR_NOZZLE) {
