@@ -27,10 +27,10 @@ extern "C" {
 #define MOTOR_NOZZLE_A_MINUS    PA_14
 #define MOTOR_NOZZLE_B_MINUS    PA_15
 
-#define MOTOR_BASE_A_PLUS       PB_4
-#define MOTOR_BASE_B_PLUS       PB_5
-#define MOTOR_BASE_A_MINUS      PB_6
-#define MOTOR_BASE_B_MINUS      PB_7
+#define MOTOR_BASE_A_PLUS       PB_21
+#define MOTOR_BASE_B_PLUS       PB_20
+#define MOTOR_BASE_A_MINUS      PB_19
+#define MOTOR_BASE_B_MINUS      PB_18
 
 // 定时器定义
 #define MOTOR_TIMER_NOZZLE      TIMER2

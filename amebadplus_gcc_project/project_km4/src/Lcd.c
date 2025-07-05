@@ -5,6 +5,7 @@
 #include "gpio_api.h"
 #include "ameba_gdma.h"
 #include "Lcd.h"
+#include "images.h"
 
 
 #ifndef DelayMs
@@ -14,6 +15,8 @@
 // SPI对象
 static spi_t spi_master;
 static GDMA_InitTypeDef GDMA_InitStruct;
+
+static void LCD_Display_FullScreen_2(uint16_t *flash_address);
 
 // LCD控制引脚宏定义 - 需要根据实际硬件连接修改
 #define LCD_RES_PIN         _PA_12
@@ -402,12 +405,10 @@ void DisplayLCD_Init(void)
     DelayMs(100);
     
     // 填充黑色
-    LCD_Fill_FixedColor_Simple(0, LCD_W-1, 0,LCD_H-1, WHITE);
+    LCD_Fill_FixedColor_Simple(0, LCD_W-1, 0,LCD_H-1, BLACK);
     printf("LCD initialized successfully\n");
 
-    LCD_Fill_FixedColor_Simple(0, 19, 0,19, BLACK);
-
-     LCD_Fill_FixedColor_Simple(0, 239, 0,239, BLUE);
+     LCD_Display_FullScreen_2((uint16_t *)epd_bitmap_);
 }
 
 // 显示全屏图片
@@ -418,6 +419,22 @@ void LCD_Display_FullScreen(uint16_t *flash_address)
     
     LCD_Address_Set(0, 0, LCD_W-1, LCD_H-1);
     
+    LCD_CS_Clr();
+    for (i = 0; i < total_pixels; i++) {
+        spi_master_write(&spi_master, flash_address[i] >> 8);
+        spi_master_write(&spi_master, flash_address[i] & 0xFF);
+    }
+    LCD_CS_Set();
+}
+
+// 显示images.h图片
+static void LCD_Display_FullScreen_2(uint16_t *flash_address)
+{
+    uint32_t total_pixels = 240 * 57;
+    uint32_t i;
+
+    LCD_Address_Set(0, 0, 239, 56);
+
     LCD_CS_Clr();
     for (i = 0; i < total_pixels; i++) {
         spi_master_write(&spi_master, flash_address[i] >> 8);

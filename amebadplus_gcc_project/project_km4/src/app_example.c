@@ -4,6 +4,7 @@
 #include "main.h"
 #include "TimeEvent.h"
 #include "Lcd.h"
+#include "step_motor.h"
 
 /*===================================  Types ================================*/
 typedef struct {
@@ -354,6 +355,9 @@ void start_timer_event_system(void)
 void app_example(void)
 {
     printf("hello world\n");
-    DisplayLCD_Init();
+
+    stepper_motor_init();
+    stepper_motor_set_speed_profile(MOTOR_BASE, 500, 50);
+    //DisplayLCD_Init();
    
 }
