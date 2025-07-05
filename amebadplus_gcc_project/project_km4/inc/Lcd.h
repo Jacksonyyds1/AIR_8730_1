@@ -6,8 +6,12 @@
 #include "os_wrapper.h"
 
 // LCD尺寸定义
-#define LCD_W               80
-#define LCD_H               160
+ #define LCD_W               240
+#define LCD_H                240
+
+//ST7789V2 偏移量
+#define ST7789V2_X_OFFSET    0
+#define ST7789V2_Y_OFFSET    80
 
 // 画笔颜色定义
 #define WHITE               0xFFFF
@@ -16,7 +20,7 @@
 #define BRED                0XF81F
 #define GRED                0XFFE0
 #define GBLUE               0X07FF
-#define RED                 0xF880  // RGB:FF1100
+#define RED                 0xF800  // RGB:FF1100
 #define ORANGE              0xFC00  // RGB:FF8000
 #define PINK                0XFAB9  // RGB:FF57CA
 #define PURPLE              0X929F  // RGB:9752FF

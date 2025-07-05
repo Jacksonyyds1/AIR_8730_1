@@ -20,7 +20,7 @@
     "RsipIv": "00000000000000000000000000000000"
   },
   "Profile": "D:\\RealTek_8730EA_project\\8730_SDK\\ameba-rtos\\tools\\ameba\\ImageTool\\Devices\\Profiles\\AmebaDplus_FreeRTOS_NOR.rdev",
-  "SerialPort": "JLink CDC UART Port (COM4)",
+  "SerialPort": "Prolific PL2303GC USB Serial COM Port (COM9)",
   "Baudrate": 1500000,
   "RamDownloadPaddingByte": 0,
   "SensePacketCount": 32,

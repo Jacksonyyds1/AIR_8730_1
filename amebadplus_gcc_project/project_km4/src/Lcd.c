@@ -6,6 +6,11 @@
 #include "ameba_gdma.h"
 #include "Lcd.h"
 
+
+#ifndef DelayMs
+#define DelayMs(ms) rtos_time_delay_ms(ms)
+#endif
+
 // SPI对象
 static spi_t spi_master;
 static GDMA_InitTypeDef GDMA_InitStruct;
@@ -21,9 +26,6 @@ static GDMA_InitTypeDef GDMA_InitStruct;
 #define SPI_SCLK_PIN        _PA_30
 #define SPI_CS_PIN          _PA_21
 
-// LCD尺寸定义
-#define LCD_W               80
-#define LCD_H               160
 
 
 // GPIO控制宏
@@ -181,12 +183,14 @@ void LCD_WR_REG(uint8_t dat)
 // 设置显示地址
 void LCD_Address_Set(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2)
 {
+    printf("Settint address:(%d, %d) to (%d, %d)\n", x1, y1, x2, y2);
+
     LCD_WR_REG(0x2a);  // 列地址设置
-    LCD_WR_DATA(x1 + 0x1A);
-    LCD_WR_DATA(x2 + 0x1A);
+    LCD_WR_DATA(x1+ST7789V2_X_OFFSET);// 
+    LCD_WR_DATA(x2+ST7789V2_X_OFFSET);// 
     LCD_WR_REG(0x2b);  // 行地址设置
-    LCD_WR_DATA(y1 + 1);
-    LCD_WR_DATA(y2 + 1);
+    LCD_WR_DATA(y1+ST7789V2_Y_OFFSET);
+    LCD_WR_DATA(y2+ST7789V2_Y_OFFSET);
     LCD_WR_REG(0x2c);  // 储存器写
 }
 
@@ -275,7 +279,7 @@ void DisplayLCD_Init(void)
     LCD_DMA_Init();
     
     // 背光开启
-    LCD_BL_Set();
+    //LCD_BL_Set();
     
     // 复位时序
     LCD_RES_Set();
@@ -372,14 +376,14 @@ void DisplayLCD_Init(void)
     WriteComm(0x3A);     
     WriteData(0x05);   
     
-    WriteComm(0x36);     // BGR
+    WriteComm(0x36);     // BGR 
     WriteData(0xC8);   
     
     WriteComm(0x21);     // Display inversion
     
     WriteComm(0x29);     // Display on
     
-    WriteComm(0x2A);     // Set Column Address
+   /*  WriteComm(0x2A);     // Set Column Address
     WriteData(0x00);   
     WriteData(0x1A);   // 26  
     WriteData(0x00);   
@@ -389,14 +393,21 @@ void DisplayLCD_Init(void)
     WriteData(0x00);   
     WriteData(0x01);   // 1
     WriteData(0x00);   
-    WriteData(0xA0);   // 160
+    WriteData(0xA0);   // 160 */
     
     WriteComm(0x2C);
-    
+
+    printf("Display window set to full 240x240\n");
+
     DelayMs(100);
     
     // 填充黑色
-    LCD_Fill_FixedColor_Simple(0, LCD_W-1, 0, LCD_H-1, RED);
+    LCD_Fill_FixedColor_Simple(0, LCD_W-1, 0,LCD_H-1, WHITE);
+    printf("LCD initialized successfully\n");
+
+    LCD_Fill_FixedColor_Simple(0, 19, 0,19, BLACK);
+
+     LCD_Fill_FixedColor_Simple(0, 239, 0,239, BLUE);
 }
 
 // 显示全屏图片

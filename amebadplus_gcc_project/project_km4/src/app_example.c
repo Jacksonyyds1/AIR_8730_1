@@ -355,5 +355,5 @@ void app_example(void)
 {
     printf("hello world\n");
     DisplayLCD_Init();
-    //start_timer_event_system();
+   
 }
