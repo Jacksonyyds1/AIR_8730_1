@@ -16,7 +16,7 @@
 static spi_t spi_master;
 static GDMA_InitTypeDef GDMA_InitStruct;
 
-static void LCD_Display_FullScreen_2(uint16_t *flash_address);
+//static void LCD_Display_FullScreen_2(uint16_t *flash_address);
 
 // LCD控制引脚宏定义 - 需要根据实际硬件连接修改
 #define LCD_RES_PIN         _PA_12
@@ -405,10 +405,12 @@ void DisplayLCD_Init(void)
     DelayMs(100);
     
     // 填充黑色
-    LCD_Fill_FixedColor_Simple(0, LCD_W-1, 0,LCD_H-1, BLACK);
+    LCD_Fill_FixedColor_Simple(0, LCD_W-1, 0,LCD_H-1, WHITE);
     printf("LCD initialized successfully\n");
-
-     LCD_Display_FullScreen_2((uint16_t *)epd_bitmap_);
+   // DelayMs(1000);
+    // LCD_Fill_FixedColor_Simple(0, LCD_W-1, 0,LCD_H-1, WHITE);
+    // DelayMs(1000);
+    // LCD_Display_FullScreen_2((uint16_t *)epd_bitmap_);
 }
 
 // 显示全屏图片
@@ -428,7 +430,7 @@ void LCD_Display_FullScreen(uint16_t *flash_address)
 }
 
 // 显示images.h图片
-static void LCD_Display_FullScreen_2(uint16_t *flash_address)
+/* static void LCD_Display_FullScreen_2(uint16_t *flash_address)
 {
     uint32_t total_pixels = 240 * 57;
     uint32_t i;
@@ -441,7 +443,7 @@ static void LCD_Display_FullScreen_2(uint16_t *flash_address)
         spi_master_write(&spi_master, flash_address[i] & 0xFF);
     }
     LCD_CS_Set();
-}
+} */
 
 // 背光控制
 void LCD_BacklightOnOff(uint8_t onoff)

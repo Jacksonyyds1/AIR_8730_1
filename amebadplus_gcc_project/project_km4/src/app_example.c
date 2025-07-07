@@ -5,6 +5,7 @@
 #include "TimeEvent.h"
 #include "Lcd.h"
 #include "step_motor.h"
+#include "task_manager.h"
 
 /*===================================  Types ================================*/
 typedef struct {
@@ -356,30 +357,20 @@ void app_example(void)
 {
     printf("hello world\n");
     printf("Starting stepper motor initialization...\n");
-    
-    // 初始化前喂狗
-   // WDG_Refresh(IWDG_DEV);
-    
+        
     stepper_motor_init();
     
     printf("Stepper motor initialized successfully!\n");
 
-    stepper_motor_set_speed_profile(MOTOR_BASE, 900, 30);
-    
+    stepper_motor_set_direction(MOTOR_BASE, Motor_Direction_Forward, 900);
     printf("Setting base motor to forward direction at 900 steps/s...\n");
     
-/*     // 持续运行并定期喂狗
-    uint32_t counter = 0;
-    while(1) {
-        printf("System running normally... counter: %lu\n", counter++);
-        
-        // 每500ms喂一次狗，确保不超时
-        WDG_Refresh(IWDG_DEV);
-        rtos_time_delay_ms(500);
-        
-        // 可以在这里添加其他应用逻辑
-        // 比如测试步进电机功能等
-    } */
-    //DisplayLCD_Init();
+        // 2. 初始化任务管理系统
+    task_manager_init();
+    
+    // 3. 启动所有应用任务
+    task_manager_start_all();
+
+   // DisplayLCD_Init();
    
 }

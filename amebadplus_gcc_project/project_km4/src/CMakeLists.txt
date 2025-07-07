@@ -44,6 +44,8 @@ ameba_list_append(private_sources
          TimeEvent.c
          step_motor.c
          Lcd.c
+         Fan_motor.c
+         task_manager.c
          )
 
 # Component private part, user config end
