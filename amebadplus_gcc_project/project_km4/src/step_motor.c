@@ -143,7 +143,7 @@ static void stepper_motor_start_timer(uint8_t index)
     if(index >= MOTOR_COUNT) return;
     
     // 计算定时器周期 (单位: 微秒)
-    uint32_t period_us = (STEP_TICKS_MAX - stepper_motor[index].current_speed) ; // 25us基准
+    uint32_t period_us = (STEP_TICKS_MAX - stepper_motor[index].current_speed)*10 ; // 10us基准
     if(period_us < 100) period_us = 100; // 最小100us，避免过快
     
     if(index == MOTOR_NOZZLE) {
@@ -382,7 +382,7 @@ static void timer_nozzle_handler(void)
     stepper_motor_driver(MOTOR_NOZZLE);
     
     // 动态调整定时器周期
-    uint32_t new_period_us = (STEP_TICKS_MAX - stepper_motor[MOTOR_NOZZLE].current_speed) * 25;
+    uint32_t new_period_us = (STEP_TICKS_MAX - stepper_motor[MOTOR_NOZZLE].current_speed) * 10;
     if(new_period_us < 100) new_period_us = 100;
     
     // 如果电机停止且速度为0，停止定时器
@@ -403,7 +403,7 @@ static void timer_base_handler(void)
     stepper_motor_driver(MOTOR_BASE);
     
     // 动态调整定时器周期
-    uint32_t new_period_us = (STEP_TICKS_MAX - stepper_motor[MOTOR_BASE].current_speed) * 25;
+    uint32_t new_period_us = (STEP_TICKS_MAX - stepper_motor[MOTOR_BASE].current_speed) * 10;
     if(new_period_us < 100) new_period_us = 100;
     
     // 如果电机停止且速度为0，停止定时器

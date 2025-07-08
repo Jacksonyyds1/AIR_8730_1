@@ -4,8 +4,9 @@
 #include "main.h"
 #include "TimeEvent.h"
 #include "Lcd.h"
-#include "step_motor.h"
+//#include "step_motor.h"
 #include "task_manager.h"
+#include "microstep_controller.h"
 
 /*===================================  Types ================================*/
 typedef struct {
@@ -357,20 +358,19 @@ void app_example(void)
 {
     printf("hello world\n");
     printf("Starting stepper motor initialization...\n");
-        
-    stepper_motor_init();
     
-    printf("Stepper motor initialized successfully!\n");
 
-    stepper_motor_set_direction(MOTOR_BASE, Motor_Direction_Forward, 900);
-    printf("Setting base motor to forward direction at 900 steps/s...\n");
-    
-        // 2. 初始化任务管理系统
+    //stepper_motor_init();
+   
+   
+    //stepper_motor_set_direction(MOTOR_BASE, Motor_Direction_Forward, 800);
+   
+    // 2. 初始化任务管理系统
     task_manager_init();
     
     // 3. 启动所有应用任务
     task_manager_start_all();
-
-   // DisplayLCD_Init();
+    printf("All tasks started successfully\n");
+    //DisplayLCD_Init();
    
 }
