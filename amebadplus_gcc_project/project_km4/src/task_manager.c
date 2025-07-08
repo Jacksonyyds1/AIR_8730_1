@@ -220,12 +220,10 @@ void lcd_display_task(void *param)
             // 根据系统状态显示不同内容
             if (!system_power_state) {
                 // 系统开机状态
-                LCD_Fill_FixedColor(0,LCD_W-1, 0, LCD_H-1, GREEN);
                 system_power_state=1;
              
             } else {
                 // 系统关机状态
-                LCD_Fill_FixedColor(0,LCD_W-1, 0, LCD_H-1, RED);
                 system_power_state=0;
             }
             

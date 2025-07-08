@@ -366,11 +366,16 @@ void app_example(void)
     //stepper_motor_set_direction(MOTOR_BASE, Motor_Direction_Forward, 800);
    
     // 2. 初始化任务管理系统
-    task_manager_init();
+   // task_manager_init();
     
     // 3. 启动所有应用任务
-    task_manager_start_all();
+    //task_manager_start_all();
     printf("All tasks started successfully\n");
-    //DisplayLCD_Init();
+    DisplayLCD_Init();
+
+    LCD_Fill_Area_DMA(0, 0, LCD_W-1, LCD_H-1, WHITE);
+
+    printf("LCD display initialized successfully\n");
+
    
 }

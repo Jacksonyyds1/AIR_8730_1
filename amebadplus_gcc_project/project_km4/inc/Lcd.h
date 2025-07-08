@@ -51,10 +51,13 @@ void WriteComm(uint8_t dat);
 void LCD_WR_DATA(uint16_t dat);
 void LCD_WR_REG(uint8_t dat);
 void LCD_Address_Set(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2);
-void LCD_Fill_FixedColor(uint8_t xsta, uint8_t xend, uint8_t ysta, uint8_t yend, uint16_t color);
 void LCD_Fill_FixedColor_Simple(uint8_t xsta, uint8_t xend, uint8_t ysta, uint8_t yend, uint16_t color);
 void LCD_Display_FullScreen(uint16_t *flash_address);
 void LCD_BacklightOnOff(uint8_t onoff);
 void DisplayLCD_Init(void);
+
+int LCD_Write_Color_Buffer_DMA(uint16_t *color_buffer, uint32_t pixel_count);
+void LCD_Fill_Area_DMA(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint16_t color);
+void LCD_Display_Image_DMA(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint16_t *image_data);
 
 #endif // __LCD_RTL8721DCM_H__

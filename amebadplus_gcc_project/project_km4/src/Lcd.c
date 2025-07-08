@@ -16,6 +16,9 @@
 static spi_t spi_master;
 static GDMA_InitTypeDef GDMA_InitStruct;
 
+static SPI_TypeDef *spi_device = NULL;  // SPI设备指针
+static u8 spi_index = 0;  // 使用SPI0，根据您的配置调整
+
 //static void LCD_Display_FullScreen_2(uint16_t *flash_address);
 
 // LCD控制引脚宏定义 - 需要根据实际硬件连接修改
@@ -52,18 +55,21 @@ static volatile u32 DMA_Complete_Flag = 0;
 
 
 
-// DMA回调函数
+// 增强的DMA回调函数
 static u32 LCD_DMA_Callback(void *para)
 {
     UNUSED(para);
-
-    u32 IsrTypeMap = 0;
     
-    // 清除中断标志
-    IsrTypeMap = GDMA_ClearINT(GDMA_InitStruct.GDMA_Index, GDMA_InitStruct.GDMA_ChNum);
+    u32 IsrTypeMap = GDMA_ClearINT(GDMA_InitStruct.GDMA_Index, GDMA_InitStruct.GDMA_ChNum);
     
     if (IsrTypeMap & TransferType) {
         DMA_Complete_Flag = 1;
+        // 可以在这里添加传输完成后的处理
+    }
+    
+    if (IsrTypeMap & ErrType) {
+        printf("DMA transfer error occurred\n");
+        DMA_Complete_Flag = 2;  // 错误标志
     }
     
     return 0;
@@ -108,19 +114,21 @@ static void LCD_SPI_Init(void)
     printf("SPI initialized with MOSI: %d, MISO: %d, SCLK: %d, CS: %d\n",
            SPI_MOSI_PIN, SPI_MISO_PIN, SPI_SCLK_PIN, SPI_CS_PIN);
 }
-
+/*****************************************SPI_DMA  start*********************************************************************/
 // DMA初始化
 static void LCD_DMA_Init(void)
 {
+     // 获取SPI设备指针
+    spi_device = SPI_DEV_TABLE[spi_index].SPIx;
     // 初始化 GDMA 结构体
     GDMA_StructInit(&GDMA_InitStruct);
     
-    // 设置 DMA 基本参数
+    // 设置 DMA 基本参数 - 针对SPI传输优化
     GDMA_InitStruct.GDMA_Index = 0;
     GDMA_InitStruct.GDMA_DIR = TTFCMemToPeri;
-    GDMA_InitStruct.GDMA_SrcMsize = MsizeOne;
+    GDMA_InitStruct.GDMA_SrcMsize = MsizeOne;        // 4字节突发传输
     GDMA_InitStruct.GDMA_SrcDataWidth = TrWidthOneByte;
-    GDMA_InitStruct.GDMA_DstMsize = MsizeOne;
+    GDMA_InitStruct.GDMA_DstMsize = MsizeOne;         // SPI FIFO单字节
     GDMA_InitStruct.GDMA_DstDataWidth = TrWidthOneByte;
     GDMA_InitStruct.GDMA_SrcInc = IncType;
     GDMA_InitStruct.GDMA_DstInc = NoChange;
@@ -128,11 +136,11 @@ static void LCD_DMA_Init(void)
     GDMA_InitStruct.GDMA_ReloadSrc = 0;
     GDMA_InitStruct.GDMA_ReloadDst = 0;
     
-    // 设置握手接口 - 如果使用SPI DMA，需要正确的握手接口
-    GDMA_InitStruct.GDMA_SrcHandshakeInterface = 0;  // 内存到外设，源不需要握手
-    GDMA_InitStruct.GDMA_DstHandshakeInterface = GDMA_HANDSHAKE_INTERFACE_SPI0_TX;  // 根据实际使用的SPI调整
+    // 设置正确的SPI握手接口
+    GDMA_InitStruct.GDMA_SrcHandshakeInterface = 0;
+    GDMA_InitStruct.GDMA_DstHandshakeInterface = SPI_DEV_TABLE[spi_index].Tx_HandshakeInterface; // 根据实际SPI调整
     
-    // 申请DMA通道 - 使用正确的API签名
+    // 申请DMA通道
     GDMA_InitStruct.GDMA_ChNum = GDMA_ChnlAlloc(GDMA_InitStruct.GDMA_Index, 
                                                LCD_DMA_Callback, 
                                                0, 
@@ -143,9 +151,142 @@ static void LCD_DMA_Init(void)
         return;
     }
     
-    printf("DMA channel %d allocated successfully\n", GDMA_InitStruct.GDMA_ChNum);
+    printf("SPI DMA channel %d allocated successfully\n", GDMA_InitStruct.GDMA_ChNum);
 }
 
+// SPI DMA批量传输数据
+static int LCD_SPI_DMA_Write(uint8_t *data, uint32_t length)
+{
+    if (data == NULL || length == 0) {
+        return -1;
+    }
+    
+    // 清除DMA完成标志
+    DMA_Complete_Flag = 0;
+    
+    // 配置DMA传输参数
+    GDMA_InitStruct.GDMA_SrcAddr = (u32)data;
+    GDMA_InitStruct.GDMA_DstAddr = (u32)&spi_device->SPI_DRx[0];  // SPI0数据寄存器地址
+    GDMA_InitStruct.GDMA_BlockSize = length;
+
+    // 数据缓存清理
+    DCache_CleanInvalidate((u32)data, length);
+    
+    // 初始化DMA传输
+    GDMA_Init(GDMA_InitStruct.GDMA_Index, GDMA_InitStruct.GDMA_ChNum, &GDMA_InitStruct);
+    
+    // 启动片选
+    LCD_CS_Clr();
+
+    // 启用SPI DMA
+    SSI_SetDmaEnable(spi_device, ENABLE, SPI_BIT_TDMAE);
+    
+    // 启动DMA传输
+    GDMA_Cmd(GDMA_InitStruct.GDMA_Index, GDMA_InitStruct.GDMA_ChNum, ENABLE);
+    
+    // 等待DMA完成
+    uint32_t timeout = 1000;  // 1秒超时
+    while (DMA_Complete_Flag == 0 && timeout > 0) {
+        rtos_time_delay_ms(1);
+        timeout--;
+    }
+    
+    // 停止DMA
+    GDMA_Cmd(GDMA_InitStruct.GDMA_Index, GDMA_InitStruct.GDMA_ChNum, DISABLE);
+
+    // 禁用SPI DMA
+    SSI_SetDmaEnable(spi_device, DISABLE, SPI_BIT_TDMAE);
+    
+    // 释放片选
+    LCD_CS_Set();
+    
+    if (timeout == 0) {
+        printf("DMA transfer timeout\n");
+        return -1;
+    }
+    
+    return 0;
+}
+
+// 批量写入16位颜色数据
+int LCD_Write_Color_Buffer_DMA(uint16_t *color_buffer, uint32_t pixel_count)
+{
+    if (color_buffer == NULL || pixel_count == 0) {
+        return -1;
+    }
+    
+    
+    uint8_t *byte_buffer = (uint8_t *)rtos_mem_malloc(pixel_count * 2);
+    if (byte_buffer == NULL) {
+        printf("Memory allocation failed\n");
+        return -1;
+    }
+    
+    // 转换颜色数据为字节序列
+    for (uint32_t i = 0; i < pixel_count; i++) {
+        byte_buffer[i * 2] = (color_buffer[i] >> 8) & 0xFF;      // 高字节
+        byte_buffer[i * 2 + 1] = color_buffer[i] & 0xFF;        // 低字节
+    }
+    
+    // 执行DMA传输
+    int result = LCD_SPI_DMA_Write(byte_buffer, pixel_count * 2);
+    
+    // 释放缓冲区
+    rtos_mem_free(byte_buffer);
+    
+    return result;
+}
+// 使用DMA区域填充
+void LCD_Fill_Area_DMA(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint16_t color)
+{
+    if (x1 >= LCD_W || y1 >= LCD_H || x2 >= LCD_W || y2 >= LCD_H || x1 > x2 || y1 > y2) {
+        return;
+    }
+    
+    uint32_t total_pixels = (x2 - x1 + 1) * (y2 - y1 + 1);
+    
+    // 设置显示区域
+    LCD_Address_Set(x1, y1, x2, y2);
+    
+    // 创建颜色缓冲区
+    uint16_t *color_buffer = (uint16_t *)rtos_mem_malloc(total_pixels * 2);
+    if (color_buffer == NULL) {
+        printf("Memory allocation failed for color buffer\n");
+        return;
+    }
+    
+    // 填充颜色数据
+    for (uint32_t i = 0; i < total_pixels; i++) {
+        color_buffer[i] = color;
+    }
+    
+    // 使用DMA传输
+    if (LCD_Write_Color_Buffer_DMA(color_buffer, total_pixels) != 0) {
+        printf("DMA color buffer transfer failed\n");
+    }
+    
+    // 释放内存
+    rtos_mem_free(color_buffer);
+}
+
+// 显示图像缓冲区（使用DMA）
+void LCD_Display_Image_DMA(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint16_t *image_data)
+{
+    if (image_data == NULL || x + width > LCD_W || y + height > LCD_H) {
+        return;
+    }
+    
+    // 设置显示区域
+    LCD_Address_Set(x, y, x + width - 1, y + height - 1);
+    
+    // 使用DMA传输图像数据
+    uint32_t total_pixels = width * height;
+    if (LCD_Write_Color_Buffer_DMA(image_data, total_pixels) != 0) {
+        printf("DMA image transfer failed\n");
+    }
+}
+
+/*****************************************SPI_DMA  end*********************************************************************/
 // 写入单个数据
 void WriteData(uint8_t dat)
 {
@@ -195,55 +336,6 @@ void LCD_Address_Set(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2)
     LCD_WR_DATA(y1+ST7789V2_Y_OFFSET);
     LCD_WR_DATA(y2+ST7789V2_Y_OFFSET);
     LCD_WR_REG(0x2c);  // 储存器写
-}
-
-// 填充固定颜色
-void LCD_Fill_FixedColor(uint8_t xsta, uint8_t xend, uint8_t ysta, uint8_t yend, uint16_t color)
-{
-    uint32_t total_pixels;
-    uint16_t *fill_buffer;
-    uint32_t i;
-    
-    if (xsta >= LCD_W || ysta >= LCD_H || xend > LCD_W || yend > LCD_H || xsta >= xend || ysta >= yend)
-        return;
-    
-    LCD_Address_Set(xsta, ysta, xend, yend);
-    
-    total_pixels = (xend - xsta + 1) * (yend - ysta + 1);
-    
-    // 使用DMA传输
-    LCD_CS_Clr();
-    
-    // 创建填充缓冲区
-    fill_buffer = (uint16_t *)rtos_mem_malloc(total_pixels * 2);
-    if (fill_buffer != NULL) {
-        // 填充颜色数据
-        for (i = 0; i < total_pixels; i++) {
-            fill_buffer[i] = color;
-        }
-        
-        // 配置DMA
-        GDMA_InitStruct.GDMA_SrcAddr = (u32)fill_buffer;
-        GDMA_InitStruct.GDMA_DstAddr = (u32)&spi_master;  // 需要根据实际SPI寄存器地址修改
-        GDMA_InitStruct.GDMA_BlockSize = total_pixels * 2;
-        GDMA_InitStruct.GDMA_SrcDataWidth = TrWidthTwoBytes;
-        GDMA_InitStruct.GDMA_DstDataWidth = TrWidthTwoBytes;
-        
-        GDMA_Init(GDMA_InitStruct.GDMA_Index, GDMA_InitStruct.GDMA_ChNum, &GDMA_InitStruct);
-        
-        DMA_Complete_Flag = 0;
-        GDMA_Cmd(GDMA_InitStruct.GDMA_Index, GDMA_InitStruct.GDMA_ChNum, ENABLE);
-        
-        // 等待DMA完成
-        while (DMA_Complete_Flag == 0) {
-            rtos_time_delay_ms(1);
-        }
-        
-        GDMA_Cmd(GDMA_InitStruct.GDMA_Index, GDMA_InitStruct.GDMA_ChNum, DISABLE);
-        rtos_mem_free(fill_buffer);
-    }
-    
-    LCD_CS_Set();
 }
 
 // 简化的填充函数（不使用DMA）
@@ -405,7 +497,7 @@ void DisplayLCD_Init(void)
     DelayMs(100);
     
     // 填充黑色
-    LCD_Fill_FixedColor_Simple(0, LCD_W-1, 0,LCD_H-1, WHITE);
+    //LCD_Fill_FixedColor_Simple(0, LCD_W-1, 0,LCD_H-1, WHITE);
     printf("LCD initialized successfully\n");
    // DelayMs(1000);
     // LCD_Fill_FixedColor_Simple(0, LCD_W-1, 0,LCD_H-1, WHITE);
