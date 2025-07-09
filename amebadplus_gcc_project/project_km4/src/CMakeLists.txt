@@ -47,6 +47,7 @@ ameba_list_append(private_sources
          Fan_motor.c
          task_manager.c
          microstep_controller.c
+         lvg_lcd_adapter.c
          )
 
 # Component private part, user config end

@@ -5,13 +5,15 @@
 #include "gpio_api.h"
 #include "ameba_gdma.h"
 #include "Lcd.h"
-
+#include "images.h"  
 
 
 #ifndef DelayMs
 #define DelayMs(ms) rtos_time_delay_ms(ms)
 #endif
 
+
+//static void LCD_Display_FullScreen_2(const uint16_t *flash_address);
 // SPI对象
 static spi_t spi_master;
 static GDMA_InitTypeDef GDMA_InitStruct;
@@ -217,7 +219,7 @@ static int LCD_SPI_DMA_Write(uint8_t *data, uint32_t length)
 }
 
 // 批量写入16位图片数据
-int LCD_Write_Color_Buffer_DMA(uint16_t *color_buffer, uint32_t pixel_count)
+int LCD_Write_Color_Buffer_DMA(const uint16_t *color_buffer, uint32_t pixel_count)
 {
     if (color_buffer == NULL || pixel_count == 0) {
         return -1;
@@ -332,7 +334,7 @@ void LCD_Fill_Area_DMA(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint1
 }
 
 // 显示图像缓冲区（使用DMA）
-void LCD_Display_Image_DMA(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint16_t *image_data)
+void LCD_Display_Image_DMA(uint16_t x, uint16_t y, uint16_t width, uint16_t height, const uint16_t *image_data)
 {
     if (image_data == NULL || x + width > LCD_W || y + height > LCD_H) {
         return;
@@ -564,7 +566,9 @@ void DisplayLCD_Init(void)
    // DelayMs(1000);
     // LCD_Fill_FixedColor_Simple(0, LCD_W-1, 0,LCD_H-1, WHITE);
     // DelayMs(1000);
-    // LCD_Display_FullScreen_2((uint16_t *)epd_bitmap_);
+     //LCD_Display_FullScreen_2(epd_bitmap_);
+     LCD_Display_Image_DMA(0,0, 240, 57, epd_bitmap_);
+
 }
 
 // 显示全屏图片
@@ -584,7 +588,7 @@ void LCD_Display_FullScreen(uint16_t *flash_address)
 }
 
 // 显示images.h图片
-/* static void LCD_Display_FullScreen_2(uint16_t *flash_address)
+/* static void LCD_Display_FullScreen_2(const uint16_t *flash_address)
 {
     uint32_t total_pixels = 240 * 57;
     uint32_t i;
@@ -597,7 +601,7 @@ void LCD_Display_FullScreen(uint16_t *flash_address)
         spi_master_write(&spi_master, flash_address[i] & 0xFF);
     }
     LCD_CS_Set();
-} */
+}  */
 
 // 背光控制
 void LCD_BacklightOnOff(uint8_t onoff)
