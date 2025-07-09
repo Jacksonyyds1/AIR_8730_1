@@ -6,6 +6,7 @@ set(public_includes)                #public include directories, NOTE: relative 
 set(public_definitions)             #public definitions
 set(public_libraries)               #public libraries(files), NOTE: linked with whole-archive options
 
+
 #----------------------------------------#
 # Component public part, user config begin
 
@@ -66,4 +67,5 @@ ameba_add_internal_library(project_src
     p_COMPILE_OPTIONS
         ${private_compile_options}
 )
+
 ##########################################################################################

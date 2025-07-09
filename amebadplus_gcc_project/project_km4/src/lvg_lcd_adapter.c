@@ -1,247 +1,236 @@
-/* 
- * LVGL适配器 - 使用你现有的Lcd.c驱动
- * 文件名: lvgl_lcd_adapter.c
+/*
+ * LVGL 8.3 Compatible LCD Adapter for Realtek AmebaDPlus
+ * Modified to be compatible with LVGL 8.3 API
  */
 
-#include "ameba_soc.h"
-#include "os_wrapper.h"
+#include <stdio.h>
+#include <stdint.h>
+#include <string.h>
 #include "lvgl.h"
-#include "Lcd.h"  
-#include "lvg_lcd_adapter.h"
+#include "os_wrapper.h"
 
-/*====================
-   配置定义
- *====================*/
-#define LVGL_TICK_PERIOD    1    // LVGL时钟周期(ms)
-#define LVGL_REFRESH_PERIOD 33   // 刷新周期(ms) - 约30FPS
+// LCD 配置参数 - 根据实际LCD修改
+#define LCD_W               240
+#define LCD_H               240
+#define LVGL_TICK_PERIOD    5    // 5ms
 
-/*====================
-   全局变量
- *====================*/
-static lv_display_t *g_display = NULL;
-static lv_color_t *g_draw_buf_1 = NULL;
-static lv_color_t *g_draw_buf_2 = NULL;
-static rtos_timer_t lvgl_tick_timer;
-static rtos_task_t lvgl_task_handle;
+// 显示缓冲区 - 根据实际内存情况调整大小
+static uint8_t g_draw_buf_1[LCD_W * LCD_H * 2];  // 2 bytes per pixel for RGB565
+static uint8_t g_draw_buf_2[LCD_W * LCD_H * 2];  // 第二个缓冲区，可选
 
-/*====================
-   LVGL时钟函数
- *====================*/
-static uint32_t lvgl_tick_get_cb(void)
+// LVGL 8.3 使用的驱动结构
+static lv_disp_drv_t g_disp_drv;
+static lv_disp_draw_buf_t g_disp_buf;
+static lv_disp_t *g_display = NULL;
+
+// 定时器相关
+static rtos_timer_t g_lvgl_tick_timer = NULL;
+
+// 函数声明
+static void lvgl_flush_cb(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv_color_t *color_p);
+static void lvgl_tick_timer_callback(void *arg);
+uint32_t lvgl_tick_get_cb(void);
+
+/**
+ * LVGL tick 回调函数
+ * 用于获取系统时间，LVGL 8.3 支持自定义tick源
+ */
+uint32_t lvgl_tick_get_cb(void)
 {
     return rtos_time_get_current_system_time_ms();
 }
 
+/**
+ * 定时器回调函数
+ * 如果不使用 LV_TICK_CUSTOM，需要定期调用此函数
+ */
 static void lvgl_tick_timer_callback(void *arg)
 {
-    UNUSED(arg);
-    lv_tick_inc(LVGL_TICK_PERIOD);
+    (void)arg;  // 避免未使用参数警告
+    // 在LVGL 8.3中，如果配置了LV_TICK_CUSTOM，则不需要手动调用lv_tick_inc
+    // 如果没有配置LV_TICK_CUSTOM，则需要取消注释下面的行
+    // lv_tick_inc(LVGL_TICK_PERIOD);
 }
 
-/*====================
-   LVGL显示刷新函数 - 适配你的LCD驱动
- *====================*/
-static void lvgl_flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map)
+/**
+ * 显示刷新回调函数
+ * 在LVGL 8.3中，参数是 lv_disp_drv_t 而不是 lv_display_t
+ */
+static void lvgl_flush_cb(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv_color_t *color_p)
 {
-    int32_t x1 = area->x1;
-    int32_t y1 = area->y1;
-    int32_t x2 = area->x2;
-    int32_t y2 = area->y2;
+    (void)area;    // 避免未使用参数警告
+    (void)color_p; // 避免未使用参数警告
     
-    // 计算区域大小
-    uint32_t width = x2 - x1 + 1;
-    uint32_t height = y2 - y1 + 1;
-    uint32_t pixel_count = width * height;
+    /* 实际的LCD驱动代码应该放在这里 */
+    /* 例如：通过SPI或并行接口发送数据到LCD */
     
-    // 使用你现有的DMA函数显示图像
-    // px_map已经是RGB565格式的数据，直接使用
-    LCD_Display_Image_DMA(x1, y1, width, height, (uint16_t*)px_map);
+    // 示例代码框架：
+    // 1. 设置LCD的显示窗口
+    // lcd_set_window(area->x1, area->y1, area->x2, area->y2);
     
-    // 通知LVGL刷新完成
-    lv_display_flush_ready(disp);
+    // 2. 发送像素数据到LCD
+    // int32_t pixel_count = (area->x2 - area->x1 + 1) * (area->y2 - area->y1 + 1);
+    // lcd_send_data((uint8_t*)color_p, pixel_count * 2);  // RGB565 = 2 bytes per pixel
+    
+    // 3. 通知LVGL刷新完成
+    lv_disp_flush_ready(disp_drv);
 }
 
-/*====================
-   LVGL任务
- *====================*/
-static void lvgl_task(void *param)
+/**
+ * LVGL任务处理函数
+ */
+void lvgl_task_handler(void *param)
 {
-    UNUSED(param);
-    
-    printf("LVGL task started\n");
+    (void)param;  // 避免未使用参数警告
     
     while (1) {
-        // 处理LVGL任务
-        uint32_t time_till_next = lv_timer_handler();
+        // 处理LVGL事件和绘制
+        lv_timer_handler();
         
-        // 如果没有待处理任务，延时到下次处理
-        if (time_till_next == LV_NO_TIMER_READY) {
-            rtos_time_delay_ms(LVGL_REFRESH_PERIOD);
-        } else {
-            // 有任务需要处理，但最少延时1ms
-            rtos_time_delay_ms(LV_MIN(time_till_next, LVGL_REFRESH_PERIOD));
-        }
+        // 延时，根据实际需求调整
+        rtos_time_delay_ms(5);
     }
 }
 
-/*====================
-   LVGL初始化函数
- *====================*/
-int lvgl_init_with_your_lcd(void)
+/**
+ * 初始化LVGL和LCD适配器
+ * 兼容LVGL 8.3 API
+ */
+void lvgl_init_with_your_lcd(void)
 {
-    printf("Initializing LVGL with existing LCD driver...\n");
-    
     // 1. 初始化LVGL
     lv_init();
     
-    // 2. 设置时钟回调
-    lv_tick_set_cb(lvgl_tick_get_cb);
+    // 2. 初始化绘制缓冲区 (LVGL 8.3 方式)
+    lv_disp_draw_buf_init(&g_disp_buf, g_draw_buf_1, g_draw_buf_2, LCD_W * LCD_H);
     
-    // 3. 分配显示缓冲区
-    // 注意：这里使用你定义的LCD尺寸
-    uint32_t buf_size = LCD_W * LCD_H;
+    // 3. 初始化显示驱动 (LVGL 8.3 方式)
+    lv_disp_drv_init(&g_disp_drv);
+    g_disp_drv.hor_res = LCD_W;
+    g_disp_drv.ver_res = LCD_H;
+    g_disp_drv.flush_cb = lvgl_flush_cb;
+    g_disp_drv.draw_buf = &g_disp_buf;
     
-    g_draw_buf_1 = (lv_color_t*)rtos_mem_malloc(buf_size * sizeof(lv_color_t));
-    g_draw_buf_2 = (lv_color_t*)rtos_mem_malloc(buf_size * sizeof(lv_color_t));
+    // 可选：设置全刷新模式
+    g_disp_drv.full_refresh = 0;  // 0为部分刷新，1为全刷新
     
-    if (g_draw_buf_1 == NULL || g_draw_buf_2 == NULL) {
-        printf("Failed to allocate LVGL display buffers\n");
-        return -1;
-    }
+    // 4. 注册显示驱动
+    g_display = lv_disp_drv_register(&g_disp_drv);
     
-    printf("LVGL buffers allocated: %d x %d pixels, %lu bytes each\n", 
-           LCD_W, LCD_H, buf_size * sizeof(lv_color_t));
+    // 5. 设置tick源
+    // 方式1：使用自定义tick源 (推荐，需要在lv_conf.h中配置LV_TICK_CUSTOM)
+    // 如果lv_conf.h中已配置LV_TICK_CUSTOM，则不需要额外设置
     
-    // 4. 创建显示驱动
-    g_display = lv_display_create(LCD_W, LCD_H);
-    if (g_display == NULL) {
-        printf("Failed to create LVGL display\n");
-        return -1;
-    }
-    
-    // 5. 设置显示回调和缓冲区
-    lv_display_set_flush_cb(g_display, lvgl_flush_cb);
-    lv_display_set_buffers(g_display, g_draw_buf_1, g_draw_buf_2, 
-                          buf_size * sizeof(lv_color_t), 
-                          LV_DISPLAY_RENDER_MODE_PARTIAL);
-    
-    // 6. 创建定时器用于LVGL时钟
-    if (rtos_timer_create(&lvgl_tick_timer, 
-                         "LVGL_Tick", 
-                         LVGL_TICK_PERIOD,
-                         1,  // 周期性定时器
-                         lvgl_tick_timer_callback,
-                         NULL) != RTK_SUCCESS) {
+    // 方式2：使用定时器定期调用 lv_tick_inc (如果没有配置LV_TICK_CUSTOM)
+    if (rtos_timer_create(&g_lvgl_tick_timer, 
+                         "lvgl_tick", 
+                         0,  // timer_id
+                         LVGL_TICK_PERIOD, 
+                         1,  // 1 = 自动重载
+                         lvgl_tick_timer_callback) != 0) {
         printf("Failed to create LVGL tick timer\n");
-        return -1;
-    }
-    
-    // 7. 启动定时器
-    if (rtos_timer_start(lvgl_tick_timer, 0) != RTK_SUCCESS) {
-        printf("Failed to start LVGL tick timer\n");
-        return -1;
-    }
-    
-    // 8. 创建LVGL任务
-    if (rtos_task_create(&lvgl_task_handle,
-                        "LVGL_Task",
-                        lvgl_task,
-                        NULL,
-                        8192,  // 8KB栈空间
-                        tskIDLE_PRIORITY + 2) != RTK_SUCCESS) {
-        printf("Failed to create LVGL task\n");
-        return -1;
-    }
-    
-    printf("LVGL initialized successfully with your LCD driver\n");
-    return 0;
-}
-
-/*====================
-   清理函数
- *====================*/
-void lvgl_deinit(void)
-{
-    // 停止定时器
-    if (lvgl_tick_timer) {
-        rtos_timer_stop(lvgl_tick_timer, 0);
-        rtos_timer_delete(lvgl_tick_timer, 0);
-        lvgl_tick_timer = NULL;
-    }
-    
-    // 删除任务
-    if (lvgl_task_handle) {
-        rtos_task_delete(lvgl_task_handle);
-        lvgl_task_handle = NULL;
-    }
-    
-    // 释放缓冲区
-    if (g_draw_buf_1) {
-        rtos_mem_free(g_draw_buf_1);
-        g_draw_buf_1 = NULL;
-    }
-    
-    if (g_draw_buf_2) {
-        rtos_mem_free(g_draw_buf_2);
-        g_draw_buf_2 = NULL;
-    }
-    
-    printf("LVGL deinitialized\n");
-}
-
-/*====================
-   示例UI创建函数
- *====================*/
-void create_demo_ui(void)
-{
-    // 创建一个标签
-    lv_obj_t *label = lv_label_create(lv_scr_act());
-    lv_label_set_text(label, "Hello LVGL!");
-    lv_obj_set_style_text_color(label, lv_color_white(), LV_PART_MAIN);
-    lv_obj_align(label, LV_ALIGN_CENTER, 0, -40);
-    
-    // 创建一个按钮
-    lv_obj_t *btn = lv_btn_create(lv_scr_act());
-    lv_obj_set_size(btn, 120, 50);
-    lv_obj_align(btn, LV_ALIGN_CENTER, 0, 0);
-    lv_obj_set_style_bg_color(btn, lv_color_hex(0x2196F3), LV_PART_MAIN);
-    
-    lv_obj_t *btn_label = lv_label_create(btn);
-    lv_label_set_text(btn_label, "Click Me");
-    lv_obj_center(btn_label);
-    
-    // 创建一个进度条
-    lv_obj_t *bar = lv_bar_create(lv_scr_act());
-    lv_obj_set_size(bar, 200, 20);
-    lv_obj_align(bar, LV_ALIGN_CENTER, 0, 40);
-    lv_bar_set_value(bar, 70, LV_ANIM_OFF);
-    
-    printf("Demo UI created\n");
-}
-
-/*====================
-   集成到你的app_example函数
- *====================*/
-void app_example_with_lvgl(void)
-{
-    printf("Starting application with LVGL...\n");
-    
-    // 1. 初始化你的LCD驱动（保持原有的初始化）
-    DisplayLCD_Init();
-    printf("LCD display initialized successfully\n");
-    
-    // 2. 初始化LVGL（使用你的LCD驱动）
-    if (lvgl_init_with_your_lcd() != 0) {
-        printf("Failed to initialize LVGL\n");
         return;
     }
     
-    // 3. 创建演示UI
-    create_demo_ui();
+    // 6. 启动定时器
+    if (rtos_timer_start(g_lvgl_tick_timer, 0) != 0) {
+        printf("Failed to start LVGL tick timer\n");
+        return;
+    }
     
-    // 4. 可以继续添加你的其他初始化代码
-    // task_manager_init();
-    // task_manager_start_all();
+    // 7. 创建LVGL任务
+    // 根据实际需求调整堆栈大小和优先级
+    if (rtos_task_create(NULL, 
+                        "lvgl_task", 
+                        lvgl_task_handler, 
+                        NULL, 
+                        2048, 
+                        1 + 2) != 0) {  // 使用具体数值而不是tskIDLE_PRIORITY
+        printf("Failed to create LVGL task\n");
+        return;
+    }
     
-    printf("Application started successfully with LVGL\n");
+    printf("LVGL 8.3 initialization completed successfully\n");
 }
+
+
+
+/**
+ * 获取显示对象指针
+ */
+lv_disp_t* lvgl_get_display(void)
+{
+    return g_display;
+}
+
+/**
+ * 清理资源
+ */
+void lvgl_deinit(void)
+{
+    if (g_lvgl_tick_timer != NULL) {
+        rtos_timer_delete(g_lvgl_tick_timer, 0);
+        g_lvgl_tick_timer = NULL;
+    }
+    
+    // 这里可以添加更多清理代码
+    // 例如删除任务、释放内存等
+}
+
+/**
+ * 示例：创建一个简单的标签测试
+ */
+void lvgl_demo_label(void)
+{
+    lv_obj_t *label = lv_label_create(lv_scr_act());
+    lv_label_set_text(label, "Hello LVGL 8.3!");
+    lv_obj_align(label, LV_ALIGN_CENTER, 0, 0);
+}
+
+/* 如果需要支持触摸屏，可以添加以下代码 */
+#ifdef ENABLE_TOUCH_INPUT
+
+// 触摸相关变量
+static lv_indev_drv_t g_indev_drv;
+static lv_indev_t *g_indev = NULL;
+
+/**
+ * 触摸读取回调函数
+ */
+static void touchpad_read_cb(lv_indev_drv_t *indev_drv, lv_indev_data_t *data)
+{
+    (void)indev_drv;  // 避免未使用参数警告
+    
+    // 这里应该实现实际的触摸读取代码
+    // 示例框架：
+    
+    // bool touched = touch_is_pressed();
+    // if (touched) {
+    //     data->state = LV_INDEV_STATE_PRESSED;
+    //     data->point.x = touch_get_x();
+    //     data->point.y = touch_get_y();
+    // } else {
+    //     data->state = LV_INDEV_STATE_RELEASED;
+    // }
+    
+    // 临时代码 - 实际使用时应该替换为真实的触摸读取
+    data->state = LV_INDEV_STATE_RELEASED;
+    data->point.x = 0;
+    data->point.y = 0;
+}
+
+/**
+ * 初始化触摸输入设备
+ */
+void lvgl_init_touchpad(void)
+{
+    // 初始化触摸驱动
+    lv_indev_drv_init(&g_indev_drv);
+    g_indev_drv.type = LV_INDEV_TYPE_POINTER;
+    g_indev_drv.read_cb = touchpad_read_cb;
+    
+    // 注册触摸设备
+    g_indev = lv_indev_drv_register(&g_indev_drv);
+}
+
+#endif /* ENABLE_TOUCH_INPUT */

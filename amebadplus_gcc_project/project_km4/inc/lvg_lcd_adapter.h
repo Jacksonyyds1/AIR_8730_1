@@ -8,7 +8,7 @@ int lvgl_init_with_your_lcd(void);
 // LVGL去初始化
 void lvgl_deinit(void);
 
-// 创建演示UI
-void create_demo_ui(void);
+// 创建演示标签
+void lvgl_demo_label(void);
 
 #endif // LVGL_LCD_ADAPTER_H
