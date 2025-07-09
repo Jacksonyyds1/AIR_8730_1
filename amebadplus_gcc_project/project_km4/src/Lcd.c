@@ -5,7 +5,7 @@
 #include "gpio_api.h"
 #include "ameba_gdma.h"
 #include "Lcd.h"
-#include "images.h"
+
 
 
 #ifndef DelayMs
@@ -17,7 +17,9 @@ static spi_t spi_master;
 static GDMA_InitTypeDef GDMA_InitStruct;
 
 static SPI_TypeDef *spi_device = NULL;  // SPI设备指针
-static u8 spi_index = 0;  // 使用SPI0，根据您的配置调整
+
+#define DMA_BLOCK_SIZE 4096 // DMA传输块大小
+
 
 //static void LCD_Display_FullScreen_2(uint16_t *flash_address);
 
@@ -119,6 +121,7 @@ static void LCD_SPI_Init(void)
 static void LCD_DMA_Init(void)
 {
      // 获取SPI设备指针
+     uint8_t spi_index = 1;
     spi_device = SPI_DEV_TABLE[spi_index].SPIx;
     // 初始化 GDMA 结构体
     GDMA_StructInit(&GDMA_InitStruct);
@@ -126,9 +129,9 @@ static void LCD_DMA_Init(void)
     // 设置 DMA 基本参数 - 针对SPI传输优化
     GDMA_InitStruct.GDMA_Index = 0;
     GDMA_InitStruct.GDMA_DIR = TTFCMemToPeri;
-    GDMA_InitStruct.GDMA_SrcMsize = MsizeOne;        // 4字节突发传输
+    GDMA_InitStruct.GDMA_SrcMsize = MsizeFour;        // 参考示例代码
     GDMA_InitStruct.GDMA_SrcDataWidth = TrWidthOneByte;
-    GDMA_InitStruct.GDMA_DstMsize = MsizeOne;         // SPI FIFO单字节
+    GDMA_InitStruct.GDMA_DstMsize = MsizeFour;         // 参考示例代码
     GDMA_InitStruct.GDMA_DstDataWidth = TrWidthOneByte;
     GDMA_InitStruct.GDMA_SrcInc = IncType;
     GDMA_InitStruct.GDMA_DstInc = NoChange;
@@ -140,6 +143,12 @@ static void LCD_DMA_Init(void)
     GDMA_InitStruct.GDMA_SrcHandshakeInterface = 0;
     GDMA_InitStruct.GDMA_DstHandshakeInterface = SPI_DEV_TABLE[spi_index].Tx_HandshakeInterface; // 根据实际SPI调整
     
+    #ifndef CONFIG_AMEBAD
+    GDMA_InitStruct.GDMA_DstAddr = (u32)&SPI_DEV_TABLE[spi_index].SPIx->SPI_DRx;
+    #else
+    GDMA_InitStruct.GDMA_DstAddr = (u32)&SPI_DEV_TABLE[spi_index].SPIx->DR;
+    #endif
+
     // 申请DMA通道
     GDMA_InitStruct.GDMA_ChNum = GDMA_ChnlAlloc(GDMA_InitStruct.GDMA_Index, 
                                                LCD_DMA_Callback, 
@@ -154,7 +163,7 @@ static void LCD_DMA_Init(void)
     printf("SPI DMA channel %d allocated successfully\n", GDMA_InitStruct.GDMA_ChNum);
 }
 
-// SPI DMA批量传输数据
+// SPI DMA批量传输数据,最大传输长度为4096字节
 static int LCD_SPI_DMA_Write(uint8_t *data, uint32_t length)
 {
     if (data == NULL || length == 0) {
@@ -166,7 +175,6 @@ static int LCD_SPI_DMA_Write(uint8_t *data, uint32_t length)
     
     // 配置DMA传输参数
     GDMA_InitStruct.GDMA_SrcAddr = (u32)data;
-    GDMA_InitStruct.GDMA_DstAddr = (u32)&spi_device->SPI_DRx[0];  // SPI0数据寄存器地址
     GDMA_InitStruct.GDMA_BlockSize = length;
 
     // 数据缓存清理
@@ -208,35 +216,56 @@ static int LCD_SPI_DMA_Write(uint8_t *data, uint32_t length)
     return 0;
 }
 
-// 批量写入16位颜色数据
+// 批量写入16位图片数据
 int LCD_Write_Color_Buffer_DMA(uint16_t *color_buffer, uint32_t pixel_count)
 {
     if (color_buffer == NULL || pixel_count == 0) {
         return -1;
     }
     
-    
-    uint8_t *byte_buffer = (uint8_t *)rtos_mem_malloc(pixel_count * 2);
+    uint32_t chunk_pixels = DMA_BLOCK_SIZE / 2; // 每块2048像素
+
+    //分配固定大小的字节缓冲区
+    uint8_t *byte_buffer = (uint8_t *)rtos_mem_malloc(DMA_BLOCK_SIZE);
     if (byte_buffer == NULL) {
-        printf("Memory allocation failed\n");
+        printf("Memory allocation failed for DMA buffer\n");
         return -1;
     }
-    
-    // 转换颜色数据为字节序列
-    for (uint32_t i = 0; i < pixel_count; i++) {
-        byte_buffer[i * 2] = (color_buffer[i] >> 8) & 0xFF;      // 高字节
-        byte_buffer[i * 2 + 1] = color_buffer[i] & 0xFF;        // 低字节
+
+    uint32_t remaining_pixels = pixel_count;
+    uint32_t processed = 0;
+
+    while (remaining_pixels > 0) {
+        uint32_t current_pixels = (remaining_pixels > chunk_pixels) ? chunk_pixels : remaining_pixels;
+        
+        // 转换当前块的数据为字节序列
+        for (uint32_t i = 0; i < current_pixels; i++) {
+            uint16_t pixel = color_buffer[processed + i];
+            byte_buffer[i * 2] = (pixel >> 8) & 0xFF;      // 高字节
+            byte_buffer[i * 2 + 1] = pixel & 0xFF;         // 低字节
+        }
+        
+        // 执行DMA传输
+        if (LCD_SPI_DMA_Write(byte_buffer, current_pixels * 2) != 0) {
+            printf("DMA transfer failed at chunk %lu\n", processed / chunk_pixels);
+            rtos_mem_free(byte_buffer);
+            return -1;
+        }
+        
+        remaining_pixels -= current_pixels;
+        processed += current_pixels;
+        
+        // 显示进度（可选）
+        if ((processed / chunk_pixels) % 10 == 0) {
+            printf("Processed %lu/%lu pixels\n", processed, pixel_count);
+        }
     }
     
-    // 执行DMA传输
-    int result = LCD_SPI_DMA_Write(byte_buffer, pixel_count * 2);
-    
-    // 释放缓冲区
     rtos_mem_free(byte_buffer);
-    
-    return result;
+    printf("Color buffer DMA transfer completed: %lu pixels\n", pixel_count);
+    return 0;
 }
-// 使用DMA区域填充
+// 使用DMA区域填充颜色
 void LCD_Fill_Area_DMA(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint16_t color)
 {
     if (x1 >= LCD_W || y1 >= LCD_H || x2 >= LCD_W || y2 >= LCD_H || x1 > x2 || y1 > y2) {
@@ -244,29 +273,62 @@ void LCD_Fill_Area_DMA(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint1
     }
     
     uint32_t total_pixels = (x2 - x1 + 1) * (y2 - y1 + 1);
+    uint32_t total_bytes = total_pixels * 2; // 每个像素16位
+
+    printf("Total pixels: %lu, Total bytes: %lu\n", total_pixels, total_bytes);
     
     // 设置显示区域
     LCD_Address_Set(x1, y1, x2, y2);
     
-    // 创建颜色缓冲区
-    uint16_t *color_buffer = (uint16_t *)rtos_mem_malloc(total_pixels * 2);
-    if (color_buffer == NULL) {
-        printf("Memory allocation failed for color buffer\n");
+    
+    // 分配合理大小的缓冲区 (2048像素 = 4096字节)
+    uint32_t chunk_pixels = DMA_BLOCK_SIZE / 2;  // 每块2048像素
+    uint8_t *byte_buffer = (uint8_t *)rtos_mem_malloc(DMA_BLOCK_SIZE);
+    
+    if (byte_buffer == NULL) {
+        printf("Memory allocation failed for DMA buffer\n");
         return;
     }
     
     // 填充颜色数据
-    for (uint32_t i = 0; i < total_pixels; i++) {
-        color_buffer[i] = color;
+    for (uint32_t i = 0; i < chunk_pixels; i++) {
+        byte_buffer[i * 2] = (color >> 8) & 0xFF;      // 高字节
+        byte_buffer[i * 2 + 1] = color & 0xFF;        // 低字节
     }
+
+        // 分块传输
+        uint32_t remaining_pixels = total_pixels;
+        uint32_t transferred = 0;
     
-    // 使用DMA传输
-    if (LCD_Write_Color_Buffer_DMA(color_buffer, total_pixels) != 0) {
-        printf("DMA color buffer transfer failed\n");
+        while (remaining_pixels > 0) {
+        uint32_t current_pixels = (remaining_pixels > chunk_pixels) ? chunk_pixels : remaining_pixels;
+        uint32_t current_bytes = current_pixels * 2;
+        
+        // 如果是最后一块且不满，需要重新填充缓冲区
+        if (current_pixels < chunk_pixels) {
+            for (uint32_t i = 0; i < current_pixels; i++) {
+                byte_buffer[i * 2] = (color >> 8) & 0xFF;
+                byte_buffer[i * 2 + 1] = color & 0xFF;
+            }
+        }
+        
+        // 执行DMA传输
+        if (LCD_SPI_DMA_Write(byte_buffer, current_bytes) != 0) {
+            printf("DMA transfer failed at block %lu\n", transferred);
+            break;
+        }
+        
+        remaining_pixels -= current_pixels;
+        transferred++;
+        
+        // 显示进度
+        if (transferred % 10 == 0) {
+            printf("Transferred %lu blocks, remaining pixels: %lu\n", transferred, remaining_pixels);
+        }
     }
-    
     // 释放内存
-    rtos_mem_free(color_buffer);
+    rtos_mem_free(byte_buffer);
+    printf("DMA fill completed,total blocks:%lu\n", transferred);
 }
 
 // 显示图像缓冲区（使用DMA）
@@ -497,7 +559,7 @@ void DisplayLCD_Init(void)
     DelayMs(100);
     
     // 填充黑色
-    //LCD_Fill_FixedColor_Simple(0, LCD_W-1, 0,LCD_H-1, WHITE);
+    LCD_Fill_FixedColor_Simple(0, LCD_W-1, 0,LCD_H-1, BLACK);
     printf("LCD initialized successfully\n");
    // DelayMs(1000);
     // LCD_Fill_FixedColor_Simple(0, LCD_W-1, 0,LCD_H-1, WHITE);

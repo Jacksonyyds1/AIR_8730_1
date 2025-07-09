@@ -7,6 +7,7 @@
 //#include "step_motor.h"
 #include "task_manager.h"
 #include "microstep_controller.h"
+#include "images.h"
 
 /*===================================  Types ================================*/
 typedef struct {
@@ -370,11 +371,13 @@ void app_example(void)
     
     // 3. 启动所有应用任务
     //task_manager_start_all();
-    printf("All tasks started successfully\n");
+ printf("All tasks started successfully\n");
     DisplayLCD_Init();
 
-    LCD_Fill_Area_DMA(0, 0, LCD_W-1, LCD_H-1, WHITE);
+    LCD_Fill_Area_DMA(0, 0, 239, 239, BLACK);
 
+    LCD_Display_Image_DMA(0, 0, 239, 57, (uint16_t*)epd_bitmap_);
+ 
     printf("LCD display initialized successfully\n");
 
    

@@ -219,10 +219,14 @@ void lcd_display_task(void *param)
             
             // 根据系统状态显示不同内容
             if (!system_power_state) {
+
+                 LCD_Fill_Area_DMA(0, 0, 239, 239, WHITE);
+
                 // 系统开机状态
                 system_power_state=1;
              
             } else {
+                 LCD_Fill_Area_DMA(0, 0, 239, 239, GBLUE);
                 // 系统关机状态
                 system_power_state=0;
             }
