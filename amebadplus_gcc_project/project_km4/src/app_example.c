@@ -374,14 +374,14 @@ void app_example(void)
     //task_manager_start_all();
  //printf("All tasks started successfully\n");
     DisplayLCD_Init();
-/* 
+
     printf("LCD display initialized successfully\n");
 
     if (lvgl_init_with_your_lcd() != 0) {
         printf("Failed to initialize LVGL\n");
         return;
     }
-
-    create_demo_ui();
-    printf("Application started successfully with LVGL\n"); */
+    
+    lvgl_demo_label();
+    printf("Application started successfully with LVGL\n"); 
 }

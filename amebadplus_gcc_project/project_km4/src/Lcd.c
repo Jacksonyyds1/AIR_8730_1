@@ -567,7 +567,7 @@ void DisplayLCD_Init(void)
     // LCD_Fill_FixedColor_Simple(0, LCD_W-1, 0,LCD_H-1, WHITE);
     // DelayMs(1000);
      //LCD_Display_FullScreen_2(epd_bitmap_);
-     LCD_Display_Image_DMA(0,0, 240, 57, epd_bitmap_);
+     //LCD_Display_Image_DMA(0,0, 240, 57, epd_bitmap_);
 
 }
 

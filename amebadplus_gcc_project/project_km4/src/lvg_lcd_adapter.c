@@ -1,6 +1,6 @@
 /*
  * LVGL 8.3 Compatible LCD Adapter for Realtek AmebaDPlus
- * Modified to be compatible with LVGL 8.3 API
+ * Modified to be compatible with LVGL 8.3 API and connect to LCD DMA functions
  */
 
 #include <stdio.h>
@@ -8,6 +8,7 @@
 #include <string.h>
 #include "lvgl.h"
 #include "os_wrapper.h"
+#include "Lcd.h"  // 添加LCD头文件
 
 // LCD 配置参数 - 根据实际LCD修改
 #define LCD_W               240
@@ -53,26 +54,41 @@ static void lvgl_tick_timer_callback(void *arg)
 }
 
 /**
- * 显示刷新回调函数
+ * 显示刷新回调函数 - 关键修改：连接到LCD DMA函数
  * 在LVGL 8.3中，参数是 lv_disp_drv_t 而不是 lv_display_t
  */
 static void lvgl_flush_cb(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv_color_t *color_p)
 {
-    (void)area;    // 避免未使用参数警告
-    (void)color_p; // 避免未使用参数警告
+    // 检查参数有效性
+    if (area == NULL || color_p == NULL) {
+        lv_disp_flush_ready(disp_drv);
+        return;
+    }
     
-    /* 实际的LCD驱动代码应该放在这里 */
-    /* 例如：通过SPI或并行接口发送数据到LCD */
+    // 计算显示区域参数
+    uint16_t x1 = area->x1;
+    uint16_t y1 = area->y1;
+    uint16_t x2 = area->x2;
+    uint16_t y2 = area->y2;
+    uint16_t width = x2 - x1 + 1;
+    uint16_t height = y2 - y1 + 1;
     
-    // 示例代码框架：
-    // 1. 设置LCD的显示窗口
-    // lcd_set_window(area->x1, area->y1, area->x2, area->y2);
+    // 设置LCD显示窗口
+    LCD_Address_Set(x1, y1, x2, y2);
     
-    // 2. 发送像素数据到LCD
-    // int32_t pixel_count = (area->x2 - area->x1 + 1) * (area->y2 - area->y1 + 1);
-    // lcd_send_data((uint8_t*)color_p, pixel_count * 2);  // RGB565 = 2 bytes per pixel
+    // 使用DMA传输图像数据到LCD
+    // color_p 是16位RGB565格式的颜色数据
+    uint32_t pixel_count = width * height;
     
-    // 3. 通知LVGL刷新完成
+    // 调用LCD的DMA传输函数
+    if (LCD_Write_Color_Buffer_DMA((const uint16_t*)color_p, pixel_count) != 0) {
+        printf("LVGL flush: DMA transfer failed for area (%d,%d)-(%d,%d)\n", x1, y1, x2, y2);
+    } else {
+        printf("LVGL flush: DMA transfer completed for area (%d,%d)-(%d,%d), pixels: %lu\n", 
+               x1, y1, x2, y2, pixel_count);
+    }
+    
+    // 通知LVGL刷新完成
     lv_disp_flush_ready(disp_drv);
 }
 
@@ -94,11 +110,13 @@ void lvgl_task_handler(void *param)
 
 /**
  * 初始化LVGL和LCD适配器
- * 兼容LVGL 8.3 API
+ * 兼容LVGL 8.3 API，并初始化LCD硬件
  */
-void lvgl_init_with_your_lcd(void)
+int lvgl_init_with_your_lcd(void)
 {
+    
     // 1. 初始化LVGL
+    printf("Initializing LVGL...\n");
     lv_init();
     
     // 2. 初始化绘制缓冲区 (LVGL 8.3 方式)
@@ -108,7 +126,7 @@ void lvgl_init_with_your_lcd(void)
     lv_disp_drv_init(&g_disp_drv);
     g_disp_drv.hor_res = LCD_W;
     g_disp_drv.ver_res = LCD_H;
-    g_disp_drv.flush_cb = lvgl_flush_cb;
+    g_disp_drv.flush_cb = lvgl_flush_cb;  // 使用修改后的回调函数
     g_disp_drv.draw_buf = &g_disp_buf;
     
     // 可选：设置全刷新模式
@@ -116,6 +134,10 @@ void lvgl_init_with_your_lcd(void)
     
     // 4. 注册显示驱动
     g_display = lv_disp_drv_register(&g_disp_drv);
+    if (g_display == NULL) {
+        printf("Failed to register LVGL display driver\n");
+        return -1;
+    }
     
     // 5. 设置tick源
     // 方式1：使用自定义tick源 (推荐，需要在lv_conf.h中配置LV_TICK_CUSTOM)
@@ -129,13 +151,13 @@ void lvgl_init_with_your_lcd(void)
                          1,  // 1 = 自动重载
                          lvgl_tick_timer_callback) != 0) {
         printf("Failed to create LVGL tick timer\n");
-        return;
+        return -2;
     }
     
     // 6. 启动定时器
     if (rtos_timer_start(g_lvgl_tick_timer, 0) != 0) {
         printf("Failed to start LVGL tick timer\n");
-        return;
+        return -3;
     }
     
     // 7. 创建LVGL任务
@@ -147,13 +169,12 @@ void lvgl_init_with_your_lcd(void)
                         2048, 
                         1 + 2) != 0) {  // 使用具体数值而不是tskIDLE_PRIORITY
         printf("Failed to create LVGL task\n");
-        return;
+        return -4;
     }
     
     printf("LVGL 8.3 initialization completed successfully\n");
+    return 0;
 }
-
-
 
 /**
  * 获取显示对象指针
@@ -183,8 +204,11 @@ void lvgl_deinit(void)
 void lvgl_demo_label(void)
 {
     lv_obj_t *label = lv_label_create(lv_scr_act());
-    lv_label_set_text(label, "Hello LVGL 8.3!");
+    lv_label_set_text(label, "Hello LVGL 8.3!\nLCD DMA Connected!");
     lv_obj_align(label, LV_ALIGN_CENTER, 0, 0);
+    
+    // 测试填充颜色
+    LCD_Fill_Area_DMA(0, 0, 240, 240, 0x0000); // 红色方块
 }
 
 /* 如果需要支持触摸屏，可以添加以下代码 */
