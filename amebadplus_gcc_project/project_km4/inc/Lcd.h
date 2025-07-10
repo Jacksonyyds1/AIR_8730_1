@@ -11,7 +11,7 @@
 
 //ST7789V2 偏移量
 #define ST7789V2_X_OFFSET    0
-#define ST7789V2_Y_OFFSET    80
+#define ST7789V2_Y_OFFSET    0
 
 // 画笔颜色定义
 #define WHITE               0xFFFF
@@ -56,7 +56,7 @@ void LCD_Display_FullScreen(uint16_t *flash_address);
 void LCD_BacklightOnOff(uint8_t onoff);
 void DisplayLCD_Init(void);
 
-int LCD_Write_Color_Buffer_DMA(const uint16_t *color_buffer, uint32_t pixel_count);
+int LCD_Write_Buffer_DMA(const uint16_t *color_buffer, uint32_t pixel_count);
 void LCD_Fill_Area_DMA(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint16_t color);
 void LCD_Display_Image_DMA(uint16_t x, uint16_t y, uint16_t width, uint16_t height, const uint16_t *image_data);
 

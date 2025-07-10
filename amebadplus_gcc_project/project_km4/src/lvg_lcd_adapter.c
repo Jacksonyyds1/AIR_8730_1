@@ -20,9 +20,9 @@ static uint8_t g_draw_buf_1[LCD_W * LCD_H * 2];  // 2 bytes per pixel for RGB565
 static uint8_t g_draw_buf_2[LCD_W * LCD_H * 2];  // 第二个缓冲区，可选
 
 // LVGL 8.3 使用的驱动结构
-static lv_disp_drv_t g_disp_drv;
-static lv_disp_draw_buf_t g_disp_buf;
-static lv_disp_t *g_display = NULL;
+static lv_disp_drv_t g_disp_drv;       // 显示驱动配置
+static lv_disp_draw_buf_t g_disp_buf;  // 绘制缓冲区管理
+static lv_disp_t *g_display = NULL;    // 显示设备句柄
 
 // 定时器相关
 static rtos_timer_t g_lvgl_tick_timer = NULL;
@@ -54,8 +54,16 @@ static void lvgl_tick_timer_callback(void *arg)
 }
 
 /**
- * 显示刷新回调函数 - 关键修改：连接到LCD DMA函数
- * 在LVGL 8.3中，参数是 lv_disp_drv_t 而不是 lv_display_t
+ * 显示刷新回调函数 - LVGL的核心接口
+ * 
+ * 工作原理：
+ * 1. LVGL在内存中绘制UI元素
+ * 2. 当需要更新屏幕时，调用这个函数
+ * 3. 这个函数负责将内存中的图像数据传输到LCD硬件
+ * 参数解释：
+ * - disp_drv: 显示驱动对象
+ * - area: 需要刷新的屏幕区域（矩形）
+ * - color_p: 指向图像数据的指针（RGB565格式）
  */
 static void lvgl_flush_cb(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv_color_t *color_p)
 {
@@ -76,18 +84,17 @@ static void lvgl_flush_cb(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv_col
     // 设置LCD显示窗口
     LCD_Address_Set(x1, y1, x2, y2);
     
-    // 使用DMA传输图像数据到LCD
-    // color_p 是16位RGB565格式的颜色数据
+    //计算像素数量
     uint32_t pixel_count = width * height;
     
     // 调用LCD的DMA传输函数
-    if (LCD_Write_Color_Buffer_DMA((const uint16_t*)color_p, pixel_count) != 0) {
+    if (LCD_Write_Buffer_DMA((const uint16_t*)color_p, pixel_count) != 0) {
         printf("LVGL flush: DMA transfer failed for area (%d,%d)-(%d,%d)\n", x1, y1, x2, y2);
     } else {
         printf("LVGL flush: DMA transfer completed for area (%d,%d)-(%d,%d), pixels: %lu\n", 
                x1, y1, x2, y2, pixel_count);
     }
-    
+
     // 通知LVGL刷新完成
     lv_disp_flush_ready(disp_drv);
 }
@@ -120,8 +127,8 @@ int lvgl_init_with_your_lcd(void)
     lv_init();
     
     // 2. 初始化绘制缓冲区 (LVGL 8.3 方式)
-    lv_disp_draw_buf_init(&g_disp_buf, g_draw_buf_1, g_draw_buf_2, LCD_W * LCD_H);
-    
+    lv_disp_draw_buf_init(&g_disp_buf, g_draw_buf_1,g_draw_buf_2 , LCD_W * LCD_H);
+
     // 3. 初始化显示驱动 (LVGL 8.3 方式)
     lv_disp_drv_init(&g_disp_drv);
     g_disp_drv.hor_res = LCD_W;
@@ -139,16 +146,12 @@ int lvgl_init_with_your_lcd(void)
         return -1;
     }
     
-    // 5. 设置tick源
-    // 方式1：使用自定义tick源 (推荐，需要在lv_conf.h中配置LV_TICK_CUSTOM)
-    // 如果lv_conf.h中已配置LV_TICK_CUSTOM，则不需要额外设置
-    
-    // 方式2：使用定时器定期调用 lv_tick_inc (如果没有配置LV_TICK_CUSTOM)
+    // 5. 设置时间基准(Tick系统)
     if (rtos_timer_create(&g_lvgl_tick_timer, 
                          "lvgl_tick", 
-                         0,  // timer_id
-                         LVGL_TICK_PERIOD, 
-                         1,  // 1 = 自动重载
+                         0,                 // timer_id    
+                         LVGL_TICK_PERIOD, //5ms周期
+                         1,                // 1 = 自动重载
                          lvgl_tick_timer_callback) != 0) {
         printf("Failed to create LVGL tick timer\n");
         return -2;
@@ -194,8 +197,6 @@ void lvgl_deinit(void)
         g_lvgl_tick_timer = NULL;
     }
     
-    // 这里可以添加更多清理代码
-    // 例如删除任务、释放内存等
 }
 
 /**
@@ -203,12 +204,55 @@ void lvgl_deinit(void)
  */
 void lvgl_demo_label(void)
 {
-    lv_obj_t *label = lv_label_create(lv_scr_act());
+    // 1. 设置屏幕背景色（通过LVGL系统）
+    lv_obj_t *screen = lv_scr_act();
+    lv_obj_set_style_bg_color(screen, lv_color_hex(0x000000), LV_PART_MAIN);  // 黑色背景
+    lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, LV_PART_MAIN);  // 完全不透明
+    
+    // 2. 创建标签
+    lv_obj_t *label = lv_label_create(screen);
     lv_label_set_text(label, "Hello LVGL 8.3!\nLCD DMA Connected!");
     lv_obj_align(label, LV_ALIGN_CENTER, 0, 0);
     
-    // 测试填充颜色
-    LCD_Fill_Area_DMA(0, 0, 240, 240, 0x0000); // 红色方块
+    // 3. 设置标签文字颜色为白色（在黑色背景上显示）
+    lv_obj_set_style_text_color(label, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+        
+    printf("LVGL demo created with black background\n");
+}
+// 动画回调包装函数
+static void anim_x_cb(void *obj, int32_t value)
+{
+    lv_obj_set_x((lv_obj_t*)obj, (lv_coord_t)value);
+}
+// =================================================================
+// 3. 动画效果
+// =================================================================
+void create_animation_demo(void)
+{
+     // 首先设置屏幕背景为黑色
+    lv_obj_t *screen = lv_scr_act();
+    lv_obj_set_style_bg_color(screen, lv_color_hex(0x000000), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, LV_PART_MAIN);
+    
+    // 创建方块（稍微优化）
+    lv_obj_t *box = lv_obj_create(screen);
+    lv_obj_set_size(box, 40, 40);  // 稍小一点
+    lv_obj_set_style_bg_color(box, lv_color_hex(0xFFFF00), LV_PART_MAIN);
+    lv_obj_set_style_border_width(box, 2, LV_PART_MAIN);
+    lv_obj_set_style_border_color(box, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+    lv_obj_set_pos(box, 10, 100);
+    
+    // 创建动画（更慢更平滑）
+    lv_anim_t a;
+    lv_anim_init(&a);
+    lv_anim_set_var(&a, box);
+    lv_anim_set_values(&a, 10, 190);
+    lv_anim_set_time(&a, 3000);      // 3秒，更慢
+    lv_anim_set_exec_cb(&a, anim_x_cb);
+    lv_anim_set_path_cb(&a, lv_anim_path_ease_in_out);
+    lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
+    lv_anim_set_playback_time(&a, 1500);
+    lv_anim_start(&a);
 }
 
 /* 如果需要支持触摸屏，可以添加以下代码 */

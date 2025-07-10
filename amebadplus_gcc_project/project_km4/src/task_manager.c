@@ -209,7 +209,7 @@ void lcd_display_task(void *param)
     DisplayLCD_Init();
     
     // 显示初始界面
-    LCD_Fill_FixedColor_Simple(0, LCD_W-1, 0, LCD_H-1, BLACK);
+    //LCD_Fill_FixedColor_Simple(0, LCD_W-1, 0, LCD_H-1, BLACK);
     
     while (1) {
         current_time = rtos_time_get_current_system_time_ms();
@@ -220,13 +220,12 @@ void lcd_display_task(void *param)
             // 根据系统状态显示不同内容
             if (!system_power_state) {
 
-                 LCD_Fill_Area_DMA(0, 0, 239, 239, WHITE);
-
+                 
                 // 系统开机状态
                 system_power_state=1;
              
             } else {
-                 LCD_Fill_Area_DMA(0, 0, 239, 239, GBLUE);
+                 
                 // 系统关机状态
                 system_power_state=0;
             }

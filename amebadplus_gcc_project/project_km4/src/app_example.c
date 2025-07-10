@@ -4,9 +4,8 @@
 #include "main.h"
 #include "TimeEvent.h"
 #include "Lcd.h"
-//#include "step_motor.h"
+#include "step_motor.h"
 #include "task_manager.h"
-#include "microstep_controller.h"
 #include "lvg_lcd_adapter.h"
 
 
@@ -362,26 +361,20 @@ void app_example(void)
     printf("Starting stepper motor initialization...\n");
     
 
-    //stepper_motor_init();
+    stepper_motor_init();
    
    
-    //stepper_motor_set_direction(MOTOR_BASE, Motor_Direction_Forward, 800);
+   // stepper_motor_set_direction(MOTOR_BASE, Motor_Direction_Forward, 800);
    
     // 2. 初始化任务管理系统
-   // task_manager_init();
+    task_manager_init();
     
     // 3. 启动所有应用任务
-    //task_manager_start_all();
+    task_manager_start_all();
  //printf("All tasks started successfully\n");
-    DisplayLCD_Init();
-
+   // DisplayLCD_Init();
+    lvgl_init_with_your_lcd();
+    create_animation_demo();
     printf("LCD display initialized successfully\n");
 
-    if (lvgl_init_with_your_lcd() != 0) {
-        printf("Failed to initialize LVGL\n");
-        return;
-    }
-    
-    lvgl_demo_label();
-    printf("Application started successfully with LVGL\n"); 
 }
