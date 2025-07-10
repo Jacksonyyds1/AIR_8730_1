@@ -267,7 +267,7 @@ void task_manager_init(void)
     
     // 初始化相关硬件模块
     // 初始化步进电机（如果还没有在app_example中初始化）
-    // stepper_motor_init();
+     stepper_motor_init();
     
     // 其他硬件初始化可以在这里添加
     

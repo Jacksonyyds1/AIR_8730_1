@@ -18,7 +18,7 @@
 /* // GPIO配置 (兼容现有引脚)
 #define MOTOR_A_PLUS_PIN    PB_21
 #define MOTOR_B_PLUS_PIN    PB_20
-#define MOTOR_A_MINUS_PIN   PB_30 //原PB_19
+#define MOTOR_A_MINUS_PIN   PB_30 
 #define MOTOR_B_MINUS_PIN   PB_18 */
 
 // 微步控制器状态

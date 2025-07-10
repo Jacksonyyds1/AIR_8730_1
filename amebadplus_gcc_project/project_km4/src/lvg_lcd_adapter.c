@@ -170,7 +170,7 @@ int lvgl_init_with_your_lcd(void)
                         lvgl_task_handler, 
                         NULL, 
                         2048, 
-                        1 + 2) != 0) {  // 使用具体数值而不是tskIDLE_PRIORITY
+                        4) != 0) {  // 使用具体数值而不是tskIDLE_PRIORITY
         printf("Failed to create LVGL task\n");
         return -4;
     }

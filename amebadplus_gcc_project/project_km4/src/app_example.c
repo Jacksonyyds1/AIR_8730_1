@@ -359,22 +359,5 @@ void app_example(void)
 {
     printf("hello world\n");
     printf("Starting stepper motor initialization...\n");
-    
-
-    stepper_motor_init();
-   
-   
-   // stepper_motor_set_direction(MOTOR_BASE, Motor_Direction_Forward, 800);
-   
-    // 2. 初始化任务管理系统
-    task_manager_init();
-    
-    // 3. 启动所有应用任务
-    task_manager_start_all();
- //printf("All tasks started successfully\n");
-   // DisplayLCD_Init();
-    lvgl_init_with_your_lcd();
-    create_animation_demo();
-    printf("LCD display initialized successfully\n");
 
 }

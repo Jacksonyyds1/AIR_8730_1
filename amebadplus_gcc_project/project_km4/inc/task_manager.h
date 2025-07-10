@@ -5,9 +5,9 @@
 #include "os_wrapper.h"
 
 /*================================ 任务优先级定义 ==============================*/
-#define KEY_TASK_PRIORITY        5    // 按键任务优先级最高
+#define KEY_TASK_PRIORITY        2    // 按键任务优先级最高
 #define MOTOR_TASK_PRIORITY      3    // 电机控制任务中等优先级  
-#define LCD_TASK_PRIORITY        2    // LCD刷新任务优先级较低
+#define LCD_TASK_PRIORITY        5    // LCD刷新任务优先级较低
 
 /*================================ 任务堆栈大小 ==============================*/
 #define KEY_TASK_STACK_SIZE      1024   // 按键任务堆栈
