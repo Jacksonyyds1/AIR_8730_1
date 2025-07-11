@@ -47,7 +47,6 @@ ameba_list_append(private_sources
          Lcd.c
          Fan_motor.c
          task_manager.c
-         microstep_controller.c
          lvg_lcd_adapter.c
          )
 

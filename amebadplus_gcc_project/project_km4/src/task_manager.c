@@ -17,7 +17,6 @@ static gpio_t control_button_gpio;
 /*================================ 全局变量定义 ==============================*/
 rtos_task_t key_task_handle = NULL;
 rtos_task_t motor_task_handle = NULL;
-rtos_task_t lcd_task_handle = NULL;
 
 // 任务间通信标志
 volatile uint8_t lcd_update_flag = 0;
@@ -40,13 +39,13 @@ void power_button_callback(Button *btn)
             printf("Power button released\n");
             // 切换系统电源状态
             set_system_power_state(!system_power_state);
-            set_lcd_update_flag(); // 触发LCD更新
+        
             break;
             
         case BTN_LONG_PRESS_START:
             printf("Power button long press - System shutdown\n");
             set_system_power_state(0);
-            set_lcd_update_flag();
+           
             break;
             
         default:
@@ -66,7 +65,7 @@ void control_button_callback(Button *btn)
             // 触发电机控制
             if (system_power_state) {
                 set_motor_control_flag(1); // 正转
-                set_lcd_update_flag();
+              
             }
             break;
             
@@ -74,7 +73,7 @@ void control_button_callback(Button *btn)
             printf("Control button long press - Reverse\n");
             if (system_power_state) {
                 set_motor_control_flag(2); // 反转
-                set_lcd_update_flag();
+                
             }
             break;
             
@@ -194,56 +193,9 @@ void motor_control_task(void *param)
     }
 }
 
-/**
- * @brief LCD显示任务
- */
-void lcd_display_task(void *param)
-{
-    UNUSED(param);
-    static uint32_t last_update_time = 0;
-    uint32_t current_time;
-    
-    printf("LCD display task started\n");
-    
-    // 初始化LCD
-    DisplayLCD_Init();
-    
-    // 显示初始界面
-    //LCD_Fill_FixedColor_Simple(0, LCD_W-1, 0, LCD_H-1, BLACK);
-    
-    while (1) {
-        current_time = rtos_time_get_current_system_time_ms();
-        
-        // 检查是否需要更新LCD或者定时刷新（每1秒强制刷新一次）
-        if (lcd_update_flag || (current_time - last_update_time > 1000)) {
-            
-            // 根据系统状态显示不同内容
-            if (!system_power_state) {
-
-                 
-                // 系统开机状态
-                system_power_state=1;
-             
-            } else {
-                 
-                // 系统关机状态
-                system_power_state=0;
-            }
-            
-            last_update_time = current_time;
-        }
-        
-        // 50ms周期检查，约20fps刷新率
-        rtos_time_delay_ms(50);
-    }
-}
 
 /*================================ 任务间通信函数 ==============================*/
 
-void set_lcd_update_flag(void)
-{
-    lcd_update_flag = 1;
-}
 
 void set_motor_control_flag(uint8_t direction)
 {
@@ -309,19 +261,6 @@ void task_manager_start_all(void)
     }
     printf("Motor control task created successfully\n");
     
-    // 创建LCD显示任务 - 较低优先级
-    ret = rtos_task_create(&lcd_task_handle,
-                          "LCDTask",
-                          lcd_display_task,
-                          NULL,
-                          LCD_TASK_STACK_SIZE,
-                          LCD_TASK_PRIORITY);
-    if (ret != RTK_SUCCESS) {
-        printf("Failed to create LCD display task! Error: %d\n", ret);
-        return;
-    }
-    printf("LCD display task created successfully\n");
-    
     printf("All tasks started successfully!\n");
 }
 
@@ -343,12 +282,6 @@ void task_manager_stop_all(void)
         motor_task_handle = NULL;
         printf("Motor control task stopped\n");
     }
-    
-    if (lcd_task_handle != NULL) {
-        rtos_task_delete(lcd_task_handle);
-        lcd_task_handle = NULL;
-        printf("LCD display task stopped\n");
-    }
-    
+  
     printf("All tasks stopped\n");
 }

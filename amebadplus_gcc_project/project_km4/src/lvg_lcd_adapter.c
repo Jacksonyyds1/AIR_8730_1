@@ -24,12 +24,10 @@ static lv_disp_drv_t g_disp_drv;       // 显示驱动配置
 static lv_disp_draw_buf_t g_disp_buf;  // 绘制缓冲区管理
 static lv_disp_t *g_display = NULL;    // 显示设备句柄
 
-// 定时器相关
-static rtos_timer_t g_lvgl_tick_timer = NULL;
+
 
 // 函数声明
 static void lvgl_flush_cb(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv_color_t *color_p);
-static void lvgl_tick_timer_callback(void *arg);
 uint32_t lvgl_tick_get_cb(void);
 
 /**
@@ -39,18 +37,6 @@ uint32_t lvgl_tick_get_cb(void);
 uint32_t lvgl_tick_get_cb(void)
 {
     return rtos_time_get_current_system_time_ms();
-}
-
-/**
- * 定时器回调函数
- * 如果不使用 LV_TICK_CUSTOM，需要定期调用此函数
- */
-static void lvgl_tick_timer_callback(void *arg)
-{
-    (void)arg;  // 避免未使用参数警告
-    // 在LVGL 8.3中，如果配置了LV_TICK_CUSTOM，则不需要手动调用lv_tick_inc
-    // 如果没有配置LV_TICK_CUSTOM，则需要取消注释下面的行
-    // lv_tick_inc(LVGL_TICK_PERIOD);
 }
 
 /**
@@ -111,7 +97,7 @@ void lvgl_task_handler(void *param)
         lv_timer_handler();
         
         // 延时，根据实际需求调整
-        rtos_time_delay_ms(5);
+        rtos_time_delay_ms(10);
     }
 }
 
@@ -145,25 +131,7 @@ int lvgl_init_with_your_lcd(void)
         printf("Failed to register LVGL display driver\n");
         return -1;
     }
-    
-    // 5. 设置时间基准(Tick系统)
-    if (rtos_timer_create(&g_lvgl_tick_timer, 
-                         "lvgl_tick", 
-                         0,                 // timer_id    
-                         LVGL_TICK_PERIOD, //5ms周期
-                         1,                // 1 = 自动重载
-                         lvgl_tick_timer_callback) != 0) {
-        printf("Failed to create LVGL tick timer\n");
-        return -2;
-    }
-    
-    // 6. 启动定时器
-    if (rtos_timer_start(g_lvgl_tick_timer, 0) != 0) {
-        printf("Failed to start LVGL tick timer\n");
-        return -3;
-    }
-    
-    // 7. 创建LVGL任务
+    // 5. 创建LVGL任务
     // 根据实际需求调整堆栈大小和优先级
     if (rtos_task_create(NULL, 
                         "lvgl_task", 
@@ -185,18 +153,6 @@ int lvgl_init_with_your_lcd(void)
 lv_disp_t* lvgl_get_display(void)
 {
     return g_display;
-}
-
-/**
- * 清理资源
- */
-void lvgl_deinit(void)
-{
-    if (g_lvgl_tick_timer != NULL) {
-        rtos_timer_delete(g_lvgl_tick_timer, 0);
-        g_lvgl_tick_timer = NULL;
-    }
-    
 }
 
 /**
@@ -251,7 +207,7 @@ void create_animation_demo(void)
     lv_anim_set_exec_cb(&a, anim_x_cb);
     lv_anim_set_path_cb(&a, lv_anim_path_ease_in_out);
     lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
-    lv_anim_set_playback_time(&a, 1500);
+    lv_anim_set_playback_time(&a, 3000);
     lv_anim_start(&a);
 }
 
