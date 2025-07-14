@@ -465,11 +465,6 @@ void DisplayLCD_Init(void)
     // 填充黑色
     //LCD_Fill_FixedColor_Simple(0, LCD_W-1, 0,LCD_H-1, WHITE);
     printf("LCD initialized successfully\n");
-   // DelayMs(1000);
-    // LCD_Fill_FixedColor_Simple(0, LCD_W-1, 0,LCD_H-1, WHITE);
-    // DelayMs(1000);
-     //LCD_Display_FullScreen_2(epd_bitmap_);
-     //LCD_Display_Image_DMA(0,0, 240, 57, epd_bitmap_);
 
 }
 
@@ -488,22 +483,6 @@ void LCD_Display_FullScreen(uint16_t *flash_address)
     }
     LCD_CS_Set();
 }
-
-// 显示images.h图片
-/* static void LCD_Display_FullScreen_2(const uint16_t *flash_address)
-{
-    uint32_t total_pixels = 240 * 57;
-    uint32_t i;
-
-    LCD_Address_Set(0, 0, 239, 56);
-
-    LCD_CS_Clr();
-    for (i = 0; i < total_pixels; i++) {
-        spi_master_write(&spi_master, flash_address[i] >> 8);
-        spi_master_write(&spi_master, flash_address[i] & 0xFF);
-    }
-    LCD_CS_Set();
-}  */
 
 // 背光控制
 void LCD_BacklightOnOff(uint8_t onoff)

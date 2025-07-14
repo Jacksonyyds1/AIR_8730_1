@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include "main.h"
 #include "TimeEvent.h"
-#include "Lcd.h"
+//#include "Lcd.h"
 #include "step_motor.h"
 #include "task_manager.h"
 #include "lvg_lcd_adapter.h"
@@ -361,22 +361,23 @@ void app_example(void)
     printf("Starting stepper motor initialization...\n");
     
 
-    stepper_motor_init();
+    //stepper_motor_init();
    
    
     //stepper_motor_set_direction(MOTOR_BASE, Motor_Direction_Forward, 800);
    
     // 2. 初始化任务管理系统
-    task_manager_init();
+/*     task_manager_init();
     
     stepper_motor_set_direction(MOTOR_BASE, Motor_Direction_Forward, 800);
     DisplayLCD_Init();
     lvgl_init_with_your_lcd();
     create_animation_demo(); 
     // 3. 启动所有应用任务
-    task_manager_start_all();
+    task_manager_start_all(); */
  //printf("All tasks started successfully\n");
- 
+    lvgl_init_with_your_lcd();
+    create_basic_ui();
     printf("LCD display initialized successfully\n");
 
 }

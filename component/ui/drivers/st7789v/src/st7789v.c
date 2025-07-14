@@ -8,14 +8,14 @@
 
 
 
-#define SPI_SCLK_PIN  	 _PA_28  //SCL
-#define SPI_MOSI_PIN 	 _PA_29  //SDA
-#define RST              _PA_21  //RES
+#define SPI_SCLK_PIN  	 _PA_30  //SCL _PA_28
+#define SPI_MOSI_PIN 	 _PA_23  //SDA _PA_29
+#define RST              _PA_12  //RES
 #define A0               _PA_22
-#define SPI_CS_PIN		 _PA_31
-#define BK               _PA_23
+#define SPI_CS_PIN		 _PA_21  //CS _PA_31
+//#define BK               _PA_23
 
-#define SPI_MISO_PIN 	 _PA_30
+#define SPI_MISO_PIN 	  _PA_20     // _PA_30
 
 #define WIDTH		240
 #define HEIGHT		320
