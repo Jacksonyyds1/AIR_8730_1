@@ -13,7 +13,7 @@
 #define RST              _PA_12  //RES
 #define A0               _PA_22
 #define SPI_CS_PIN		 _PA_21  //CS _PA_31
-//#define BK               _PA_23
+#define BK               _PA_24
 
 #define SPI_MISO_PIN 	  _PA_20     // _PA_30
 
