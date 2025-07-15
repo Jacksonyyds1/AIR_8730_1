@@ -119,13 +119,7 @@ void stepper_motor_gpio_init(void)
 void stepper_motor_timer_init(void)
 {
     printf("Timer init: Enabling timer clocks...\n");
-    
-    // 先启用定时器时钟 - TIMER2 和 TIMER3
-    //RCC_PeriphClockCmd(APBPeriph_TIMx[2], APBPeriph_TIMx_CLOCK[2], ENABLE);  // TIMER2
-    RCC_PeriphClockCmd(APBPeriph_TIMx[3], APBPeriph_TIMx_CLOCK[3], ENABLE);  // TIMER3
-    
-    printf("Timer init: Clocks enabled, initializing timers...\n");
-    
+
     // 初始化MOTOR_NOZZLE定时器
 /*     gtimer_init(&motor_timer[MOTOR_NOZZLE], MOTOR_TIMER_NOZZLE);
     printf("Timer init: MOTOR_NOZZLE timer initialized\n"); */

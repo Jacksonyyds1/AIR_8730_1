@@ -16,8 +16,9 @@
 #define LVGL_TICK_PERIOD    5    // 5ms
 
 // 显示缓冲区 - 根据实际内存情况调整大小
-static uint8_t g_draw_buf_1[LCD_W * LCD_H * 2];  // 2 bytes per pixel for RGB565
-static uint8_t g_draw_buf_2[LCD_W * LCD_H * 2];  // 第二个缓冲区，可选
+#define BUFFER_LINES 240
+static uint8_t g_draw_buf_1[LCD_W * BUFFER_LINES * 2];  // 2 bytes per pixel for RGB565
+static uint8_t g_draw_buf_2[LCD_W * BUFFER_LINES * 2];  // 第二个缓冲区，可选
 
 // LVGL 8.3 使用的驱动结构
 static lv_disp_drv_t g_disp_drv;       // 显示驱动配置
@@ -74,12 +75,8 @@ static void lvgl_flush_cb(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv_col
     uint32_t pixel_count = width * height;
     
     // 调用LCD的DMA传输函数
-    if (LCD_Write_Buffer_DMA((const uint16_t*)color_p, pixel_count) != 0) {
-        printf("LVGL flush: DMA transfer failed for area (%d,%d)-(%d,%d)\n", x1, y1, x2, y2);
-    } else {
-        printf("LVGL flush: DMA transfer completed for area (%d,%d)-(%d,%d), pixels: %lu\n", 
-               x1, y1, x2, y2, pixel_count);
-    }
+    LCD_Write_Buffer_DMA((const uint16_t*)color_p, pixel_count);
+  
 
     // 通知LVGL刷新完成
     lv_disp_flush_ready(disp_drv);
@@ -94,10 +91,10 @@ void lvgl_task_handler(void *param)
     
     while (1) {
         // 处理LVGL事件和绘制
-        lv_timer_handler();
+        uint32_t time = lv_timer_handler();
         
         // 延时，根据实际需求调整
-        rtos_time_delay_ms(10);
+        rtos_time_delay_ms(time);
     }
 }
 

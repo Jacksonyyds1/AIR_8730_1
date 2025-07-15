@@ -11,10 +11,7 @@ void lvgl_deinit(void);
 // 创建演示标签
 void lvgl_demo_label(void);
 
-void create_basic_ui(void);
-
 void create_animation_demo(void);
 
-void test_basic_display(void);
 
 #endif // LVGL_LCD_ADAPTER_H

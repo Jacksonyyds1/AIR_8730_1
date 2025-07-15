@@ -19,7 +19,7 @@
 static spi_t spi_master;
 
 
-#define DMA_BLOCK_SIZE 57600*2 // DMA传输块大小
+#define DMA_BLOCK_SIZE  4096 // DMA传输块大小
 
 
 //static void LCD_Display_FullScreen_2(uint16_t *flash_address);
@@ -198,16 +198,10 @@ int LCD_Write_Buffer_DMA(const uint16_t *color_buffer, uint32_t pixel_count)
         remaining_pixels -= current_pixels;
         processed += current_pixels;
         
-        // 显示进度（可选）
-        if ((processed / chunk_pixels) % 10 == 0) {
-            printf("Processed %lu/%lu pixels\n", processed, pixel_count);
-        }
     }
     
     rtos_mem_free(byte_buffer);
-    if(result == 0){
-    printf("Color buffer DMA transfer completed: %lu pixels\n", pixel_count);
-    }
+
     return result;
 }
 // 使用DMA区域填充颜色
@@ -320,8 +314,6 @@ void LCD_WR_REG(uint8_t dat)
 // 设置显示地址
 void LCD_Address_Set(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2)
 {
-    printf("Settint address:(%d, %d) to (%d, %d)\n", x1, y1, x2, y2);
-
     LCD_WR_REG(0x2a);  // 列地址设置
     LCD_WR_DATA(x1+ST7789V2_X_OFFSET);// 
     LCD_WR_DATA(x2+ST7789V2_X_OFFSET);// 

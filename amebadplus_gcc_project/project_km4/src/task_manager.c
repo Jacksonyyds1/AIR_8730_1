@@ -151,7 +151,7 @@ void key_scan_task(void *param)
     while (1) {
         // 调用按键扫描处理
         button_ticks();
-        
+       
         // 5ms周期扫描
         rtos_time_delay_ms(5);
     }
