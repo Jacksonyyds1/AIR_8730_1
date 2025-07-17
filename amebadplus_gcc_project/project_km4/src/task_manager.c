@@ -8,11 +8,11 @@
 /*================================ GPIO配置定义 ==============================*/
 // 按键GPIO引脚定义 - 根据实际硬件连接修改
 #define POWER_BUTTON_PIN        _PA_12    // 电源按键引脚
-#define CONTROL_BUTTON_PIN      _PA_28    // 控制按键引脚
+
+#define POWER_BUTTON_ID         0           // 电源按键ID
 
 // GPIO对象定义
 static gpio_t power_button_gpio;
-static gpio_t control_button_gpio;
 
 /*================================ 全局变量定义 ==============================*/
 rtos_task_t key_task_handle = NULL;
@@ -25,74 +25,23 @@ volatile uint8_t system_power_state = 1; // 1=开机, 0=关机
 
 // 按键对象定义
 static Button power_button;
-static Button control_button;
 
 /*================================ 按键回调函数 ==============================*/
-void power_button_callback(Button *btn)
+void power_button_callback(Button* handle)
 {
-    switch (btn->event) {
-        case BTN_PRESS_DOWN:
-            printf("Power button pressed\n");
-            break;
-            
-        case BTN_PRESS_UP:
-            printf("Power button released\n");
-            // 切换系统电源状态
-            set_system_power_state(!system_power_state);
-        
-            break;
-            
-        case BTN_LONG_PRESS_START:
-            printf("Power button long press - System shutdown\n");
-            set_system_power_state(0);
-           
-            break;
-            
-        default:
-            break;
-    }
+     UNUSED(handle);
+    printf("power button pressed\n");
+    
 }
-
-void control_button_callback(Button *btn)
-{
-    switch (btn->event) {
-        case BTN_PRESS_DOWN:
-            printf("Control button pressed\n");
-            break;
-            
-        case BTN_PRESS_UP:
-            printf("Control button released\n");
-            // 触发电机控制
-            if (system_power_state) {
-                set_motor_control_flag(1); // 正转
-              
-            }
-            break;
-            
-        case BTN_LONG_PRESS_START:
-            printf("Control button long press - Reverse\n");
-            if (system_power_state) {
-                set_motor_control_flag(2); // 反转
-                
-            }
-            break;
-            
-        default:
-            break;
-    }
-}
-
 // GPIO读取函数示例 - 需要根据实际硬件修改
 // 注意：按键库需要的是 uint8_t (*pin_level)(uint8_t button_id) 格式
 uint8_t read_button_gpio_level(uint8_t button_id)
 {
     // 根据button_id读取对应的GPIO状态
     switch (button_id) {
-        case 0: // 电源按键
+        case POWER_BUTTON_ID: // 电源按键
             return gpio_read(&power_button_gpio);
             
-        case 1: // 控制按键
-            return gpio_read(&control_button_gpio);
             
         default:
             return 1; // 默认返回未按下状态（高电平）
@@ -107,13 +56,6 @@ static void button_gpio_init(void)
     gpio_dir(&power_button_gpio, PIN_INPUT);    // 设置为输入模式
     gpio_mode(&power_button_gpio, PullUp);      // 上拉电阻，按键按下为低电平
     
-    // 初始化控制按键GPIO
-    gpio_init(&control_button_gpio, CONTROL_BUTTON_PIN);
-    gpio_dir(&control_button_gpio, PIN_INPUT);  // 设置为输入模式
-    gpio_mode(&control_button_gpio, PullUp);    // 上拉电阻，按键按下为低电平
-    
-    printf("Button GPIO initialized: Power=%d, Control=%d\n", 
-           POWER_BUTTON_PIN, CONTROL_BUTTON_PIN);
 }
 
 /*================================ 任务函数实现 ==============================*/
@@ -132,21 +74,13 @@ void key_scan_task(void *param)
     
     // 初始化按键对象
     // button_init(Button* handle, uint8_t(*pin_level)(uint8_t), uint8_t active_level, uint8_t button_id)
-    button_init(&power_button, read_button_gpio_level, 0, 0); // 低电平有效，按键ID=0
-    button_init(&control_button, read_button_gpio_level, 0, 1); // 低电平有效，按键ID=1
+    button_init(&power_button, read_button_gpio_level, 0, POWER_BUTTON_ID); // 低电平有效，按键ID=0
     
     // 注册按键回调
-    button_attach(&power_button, BTN_PRESS_DOWN, power_button_callback);
-    button_attach(&power_button, BTN_PRESS_UP, power_button_callback);
-    button_attach(&power_button, BTN_LONG_PRESS_START, power_button_callback);
-    
-    button_attach(&control_button, BTN_PRESS_DOWN, control_button_callback);
-    button_attach(&control_button, BTN_PRESS_UP, control_button_callback);
-    button_attach(&control_button, BTN_LONG_PRESS_START, control_button_callback);
-    
+    button_attach(&power_button, BTN_SINGLE_CLICK, power_button_callback);
+
     // 启动按键检测
     button_start(&power_button);
-    button_start(&control_button);
     
     while (1) {
         // 调用按键扫描处理

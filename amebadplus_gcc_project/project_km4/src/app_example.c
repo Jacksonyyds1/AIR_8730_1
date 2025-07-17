@@ -8,6 +8,7 @@
 #include "task_manager.h"
 #include "lvg_lcd_adapter.h"
 #include "timer_api.h"
+#include "Fan_motor.h"
 
 gtimer_t my_timer1;
 /**
@@ -56,7 +57,7 @@ void app_example(void)
                          NULL, 2048, 2) != RTK_SUCCESS) {
         printf("Failed to create timer event task\n");
     }
-
+    fan_controller_example();
     stepper_motor_init();
     timer_1ms_init();
    	fw_timer_event_CancelAllTimerEvent();
