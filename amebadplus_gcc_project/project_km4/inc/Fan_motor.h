@@ -5,15 +5,15 @@
 #include <stdbool.h>
 
 // 风扇配置参数
-#define FAN_FG_PULSE_PER_CYCLE  2    // 每转脉冲数
-#define FAN_PWM_FREQ           1000  // PWM频率 1kHz
+#define FAN_FG_PULSE_PER_CYCLE  12    // 每转脉冲数
+#define FAN_PWM_FREQ           4000   // PWM频率 4kHz
 #define FAN_PWM_MAX_DUTY       1000   // 最大占空比
-#define PID_OUTPUT_BIAS        200    // PID输出偏置
-#define PID_KP                 1.0f   // PID参数
-#define PID_KI                 0.1f
-#define PID_KD                 0.05f
-#define PID_OUTPUT_MAX         800
-#define PID_OUTPUT_MIN         -200
+#define PID_OUTPUT_BIAS        600    // PID输出偏置
+#define PID_KP                 0.08f   // PID参数
+#define PID_KI                 0.02f
+#define PID_KD                 0.08f
+#define PID_OUTPUT_MAX         (4000 - PID_OUTPUT_BIAS)
+#define PID_OUTPUT_MIN         (0 - PID_OUTPUT_BIAS)
 
 // GPIO和定时器配置
 #define FAN_PWM_PIN           _PB_30   // PWM输出引脚
@@ -32,4 +32,5 @@ int fan_speed_get_fg_pps(void);
 int fan_speed_get_current_duty(void);
 
 void fan_controller_example(void);
+void test_pwm_output(void);
 #endif // __FAN_MOTOR_H

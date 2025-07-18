@@ -336,7 +336,7 @@ void fan_speed_controller_init(const int *table, int size)
     fg.last_pulse_interval = 0xFFFFFFFF;
 
     // 初始化PWM输出
-    fan_pwm.pwm_idx = 3;  // 使用Channel 3
+    fan_pwm.pwm_idx = 0;  // 使用Channel 0
     fan_pwm.period = 0;
     pwmout_init(&fan_pwm, FAN_PWM_PIN);
     pwmout_period_us(&fan_pwm, 1000000 / FAN_PWM_FREQ); // 设置PWM周期
@@ -375,7 +375,7 @@ void fan_speed_controller_init(const int *table, int size)
 // RPM表示例
 static const int fan_rpm_table[] = {
     0,     // 档位0: 停转
-    1000,  // 档位1: 1000 RPM
+    500,  // 档位1: 1000 RPM
     1500,  // 档位2: 1500 RPM
     2000,  // 档位3: 2000 RPM
     2500,  // 档位4: 2500 RPM
@@ -389,10 +389,23 @@ void fan_controller_example(void)
     
     // 设置为手动模式，档位2
     fan_speed_set_auto_mode(false);
-    fan_speed_set_speed(2, false);
+    fan_speed_set_speed(3, false);
     
     // 或者设置TE模式，直接指定转速
     // fan_speed_te_set(1800);
     
     printf("Fan controller initialized\r\n");
+}
+
+void test_pwm_output(void)
+{
+    pwmout_t test_pwm;
+    test_pwm.pwm_idx = 3;
+    test_pwm.period = 0;
+    
+    pwmout_init(&test_pwm, _PB_30);
+    pwmout_period_us(&test_pwm, 250); // 1ms周期
+    pwmout_write(&test_pwm, 0.5);      // 50%占空比
+    
+    printf("PWM test output initialized\r\n");
 }
