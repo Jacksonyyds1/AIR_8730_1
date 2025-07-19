@@ -11,21 +11,6 @@
 #include <stdlib.h>
 #include "Fan_motor.h"
 
-#define FAN_PWM_TIMER_IDX         9 // 使用Timer 9作为PWM定时器
-#define FAN_FG_CAPTURE_TIMER  8 // 使用Timer 8作为FG捕获定时器
-#define FAN_TIMEOUT_TIMER        4 // 使用Timer 4作为超时定时器
-
-/* PWM配置 - Timer9 */
-#define PWM9_PRESCALER         39       // 与原有配置保持一致
-#define PWM9_PERIOD            (1000000 / FAN_PWM_FREQ)  // 根据频率计算周期
-#define PWM9_CHANNEL           0        // 使用Timer9的Channel 0
-
-/* FG捕获配置 - Timer8 */
-#define FG_CAPTURE_CHANNEL     0        // 使用Timer8的Channel 0
-#define FG_CAPTURE_MODE        TIM_CCMode_PulseWidth  // 脉宽测量模式
-
-#define FAN_PWM_PIN_TIMER9     _PB_30   // Timer9 PWM输出引脚
-#define FAN_FG_PIN_TIMER8      _PB_31   // Timer8捕获输入引脚
 // PID控制器结构体
 typedef struct {
     float kp, ki, kd;                 // PID参数
@@ -34,13 +19,15 @@ typedef struct {
     int32_t last_error;             //上次误差
 } pid_control_block_t;
 
+// FG信号运行时数据
 typedef struct {
-    uint32_t pulse_count;
-    uint32_t pulse_width_us;
-    uint32_t last_capture_time;
-    bool signal_valid;
-    uint32_t pulse_interval_us;
-} fan_fg_capture_data_t;
+    uint32_t pulse_cnt;      //脉冲计数
+    uint32_t start_time_us; //开始时间
+    volatile bool isr_lock; //中断锁
+    bool is_first_edge;     //首次边缘标志
+    uint32_t last_pulse_interval; //上一个脉冲间隔
+    uint32_t total_accumulated_time; //12个脉冲总累计时间
+} fan_fg_runtime_t;
 
 // 风扇速度运行时数据
 typedef struct {
@@ -60,12 +47,16 @@ typedef struct {
 // 全局变量
 static const int *rpm_table = NULL;
 static int table_size = 0;
-static fan_fg_capture_data_t fg_capture;
+static fan_fg_runtime_t fg;
 static fan_speed_runtime_t fan_speed_runtime;
 
 // RTOS相关
 static rtos_task_t fan_speed_task_handle = NULL;
 static rtos_sema_t fan_speed_sema = NULL;
+
+// 硬件接口
+static pwmout_t fan_pwm;
+static gpio_irq_t fan_fg_irq;
 static gtimer_t timeout_timer;
 
 //================================ PID控制器实现 ================================
@@ -138,14 +129,14 @@ int fan_rpm_median_filter(int rpm)
 }
 
 //================================ 超时定时器处理 ================================
-/* 
+
 void timeout_timer_handler(uint32_t id)
 {
     UNUSED(id);
     // 100ms超时，表示FG信号丢失
-    if(!fg_capture.isr_lock) {
-        fg_capture.is_first_edge = true;
-        fg_capture.pulse_count = 0;
+    if(!fg.isr_lock) {
+        fg.is_first_edge = true;
+        fg.pulse_cnt = 0;
         fan_speed_runtime.realtime_rpm = 0;
         
         // 通知任务处理
@@ -153,165 +144,79 @@ void timeout_timer_handler(uint32_t id)
             rtos_sema_give(fan_speed_sema);
         }
     }
-} */
-
-//================================ Timer9 PWM实现 ================================
-/**
- * @brief 初始化Timer9 PWM输出
- */
-void timer9_pwm_init(void)
-{
-    RTIM_TimeBaseInitTypeDef RTIM_InitStruct;
-    TIM_CCInitTypeDef TIM_CCInitStruct;
-
-    /* 使能Timer9时钟 */
-    RCC_PeriphClockCmd(APBPeriph_TIMx[FAN_PWM_TIMER_IDX], 
-                       APBPeriph_TIMx_CLOCK[FAN_PWM_TIMER_IDX], ENABLE);
-
-    /* Timer9基础配置 */
-    RTIM_TimeBaseStructInit(&RTIM_InitStruct);
-    RTIM_InitStruct.TIM_Idx = FAN_PWM_TIMER_IDX;
-    RTIM_InitStruct.TIM_Prescaler = PWM9_PRESCALER;
-    RTIM_InitStruct.TIM_Period = PWM9_PERIOD - 1;
-    RTIM_TimeBaseInit(TIMx[FAN_PWM_TIMER_IDX], &RTIM_InitStruct, 
-                      TIMx_irq[FAN_PWM_TIMER_IDX], NULL, NULL);
-
-    /* PWM通道配置 */
-    RTIM_CCStructInit(&TIM_CCInitStruct);
-    TIM_CCInitStruct.TIM_OCPulse = 0;  // 初始占空比为0
-    RTIM_CCxInit(TIMx[FAN_PWM_TIMER_IDX], &TIM_CCInitStruct, PWM9_CHANNEL);
-    RTIM_CCxCmd(TIMx[FAN_PWM_TIMER_IDX], PWM9_CHANNEL, TIM_CCx_Enable);
-
-    /* 配置引脚复用 */
-    Pinmux_Config(FAN_PWM_PIN_TIMER9, PINMUX_FUNCTION_PWM0);
-
-    /* 启动Timer9 */
-    RTIM_Cmd(TIMx[FAN_PWM_TIMER_IDX], ENABLE);
-    
-    printf("Timer9 PWM initialized for fan control\n");
 }
 
-/**
- * @brief 设置Timer9 PWM占空比
- * @param duty_percent: 占空比百分比 (0.0-1.0)
- */
-void timer9_pwm_set_duty(float duty_percent)
-{
-    if (duty_percent < 0.0f) duty_percent = 0.0f;
-    if (duty_percent > 1.0f) duty_percent = 1.0f;
-    
-    uint32_t pulse_width = (uint32_t)(PWM9_PERIOD * duty_percent);
-    RTIM_CCRxSet(TIMx[FAN_PWM_TIMER_IDX], pulse_width, PWM9_CHANNEL);
-}
-//================================ Timer8 FG信号中断处理 ================================
+//================================ FG信号中断处理 ================================
 
-/**
- * @brief Timer8 FG信号捕获中断处理函数
- */
-static u32 timer8_fg_capture_isr(void *data)
+void fan_fg_isr_handler(uint32_t id, gpio_irq_event event)
 {
-    UNUSED(data);
+    UNUSED(id);
+    UNUSED(event);
+    uint32_t current_time = us_ticker_read();
     
-    static uint32_t last_capture = 0;
-    uint32_t current_capture = RTIM_CCRxGet(TIMx[FAN_FG_CAPTURE_TIMER], FG_CAPTURE_CHANNEL);
-    
-    fg_capture.pulse_count++;
-    
-    if (last_capture != 0) {
-        if (current_capture > last_capture) {
-            fg_capture.pulse_interval_us = current_capture - last_capture;
-        } else {
-            // 处理定时器溢出情况
-            fg_capture.pulse_interval_us = (0xFFFF - last_capture) + current_capture;
-        }
-        fg_capture.signal_valid = true;
+    if(fg.isr_lock) {
+        return; // 主循环计算时忽略FG中断
     }
     
-    last_capture = current_capture;
-    fg_capture.last_capture_time = us_ticker_read();
-    
-    // 每12个脉冲(一圈)通知主任务
-    if (fg_capture.pulse_count >= FAN_FG_PULSE_PER_CYCLE) {
-        if (fan_speed_sema != NULL) {
-            rtos_sema_give(fan_speed_sema);
+    if(fg.is_first_edge) {
+        // 忽略第一次边缘，重置参数
+        fg.is_first_edge = false;
+        fg.start_time_us = current_time;
+        fg.last_pulse_interval = 0xFFFFFFFF;
+        fg.total_accumulated_time = 0;
+        fg.pulse_cnt = 0;
+        
+        // 重启超时定时器
+        gtimer_stop(&timeout_timer);
+        gtimer_start_one_shout(&timeout_timer, 100000, timeout_timer_handler, NULL);
+    } else {
+        uint32_t pulse_interval = current_time - fg.start_time_us;
+        
+        // 忽略小于半个上次脉冲宽度的边缘(抗干扰)
+        if(fg.last_pulse_interval == 0xFFFFFFFF || 
+           pulse_interval > fg.last_pulse_interval / 2) {
+            
+            fg.pulse_cnt++;
+            fg.total_accumulated_time += pulse_interval; //累计每个间隔
+            fg.last_pulse_interval = pulse_interval;
+            fg.start_time_us = current_time;
+            
+            // 重启超时定时器
+            gtimer_stop(&timeout_timer);
+            gtimer_start_one_shout(&timeout_timer, 100000, timeout_timer_handler, NULL);
+            
+            // 每圈计算一次转速
+            if(fg.pulse_cnt == FAN_FG_PULSE_PER_CYCLE) {
+                if(fan_speed_sema != NULL) {
+                    rtos_sema_give(fan_speed_sema);
+                }
+            }
         }
     }
-    
-    RTIM_INTClear(TIMx[FAN_FG_CAPTURE_TIMER]);
-    return 0;
 }
 
-/**
- * @brief 初始化Timer8 FG信号捕获
- */
-static void timer8_fg_capture_init(void)
-{
-    RTIM_TimeBaseInitTypeDef TIM_InitStruct;
-    TIM_CCInitTypeDef TIM_CCInitStruct;
-
-    /* 使能Timer8时钟 */
-    RCC_PeriphClockCmd(APBPeriph_TIMx[FAN_FG_CAPTURE_TIMER], 
-                       APBPeriph_TIMx_CLOCK[FAN_FG_CAPTURE_TIMER], ENABLE);
-
-    /* Timer8基础配置 */
-    RTIM_TimeBaseStructInit(&TIM_InitStruct);
-    TIM_InitStruct.TIM_Idx = FAN_FG_CAPTURE_TIMER;
-    RTIM_TimeBaseInit(TIMx[FAN_FG_CAPTURE_TIMER], &TIM_InitStruct, 
-                      TIMx_irq[FAN_FG_CAPTURE_TIMER], 
-                      (IRQ_FUN)timer8_fg_capture_isr, 0);
-
-    /* 配置输入捕获 */
-    RTIM_CCStructInit(&TIM_CCInitStruct);
-    TIM_CCInitStruct.TIM_ICPulseMode = TIM_CCMode_Inputcapture;  // 输入捕获模式
-    RTIM_CCxInit(TIMx[FAN_FG_CAPTURE_TIMER], &TIM_CCInitStruct, FG_CAPTURE_CHANNEL);
-    RTIM_INTConfig(TIMx[FAN_FG_CAPTURE_TIMER], TIM_IT_CC0, ENABLE);
-    RTIM_CCxCmd(TIMx[FAN_FG_CAPTURE_TIMER], FG_CAPTURE_CHANNEL, TIM_CCx_Enable);
-
-    /* 配置引脚复用为定时器输入 */
-    Pinmux_Config(FAN_FG_PIN_TIMER8, PINMUX_FUNCTION_TIMER);
-    PAD_PullCtrl(FAN_FG_PIN_TIMER8, GPIO_PuPd_UP);
-
-    /* 启动Timer8 */
-    RTIM_Cmd(TIMx[FAN_FG_CAPTURE_TIMER], ENABLE);
-    
-    printf("Timer8 FG capture initialized\n");
-}
-
-//================================   速度计算优化   ================================
-/**
- * @brief 计算风扇转速（基于硬件捕获数据）
- * @return 当前转速(RPM)
- */
-static int calculate_fan_rpm_from_capture(void)
-{
-    if (!fg_capture.signal_valid || fg_capture.pulse_interval_us == 0) {
-        return 0;
-    }
-    
-    // RPM = (60 * 1000000) / (脉冲间隔微秒 * 每转脉冲数)
-    int rpm = (60 * 1000000) / (fg_capture.pulse_interval_us * FAN_FG_PULSE_PER_CYCLE);
-    
-    return rpm;
-}
 //================================ 风扇速度控制任务 ================================
 
 void fan_speed_control_task(void *param)
 {
     UNUSED(param);
-    
     while(1) {
-        // 等待信号量，超时时间200ms
-        if (rtos_sema_take(fan_speed_sema, 200) == RTK_SUCCESS) {
-            // 获取硬件捕获的转速数据
-            fan_speed_runtime.realtime_rpm = calculate_fan_rpm_from_capture();
-            
-            // 重置脉冲计数
-            fg_capture.pulse_count = 0;
-        } else {
-            // 超时，可能风扇停转
-            fan_speed_runtime.realtime_rpm = 0;
-            fg_capture.signal_valid = false;
+        // 等待信号量，超时时间100ms
+        rtos_sema_take(fan_speed_sema, 100);
+        
+        // 锁定FG中断，避免在计算过程中被打断
+        fg.isr_lock = true;
+        uint32_t pulse_cnt = fg.pulse_cnt;
+        uint32_t total_time_us = 0;
+        
+        if(pulse_cnt > 0) {
+            total_time_us = fg.total_accumulated_time;
         }
+        
+        // 重置计数器
+        fg.pulse_cnt = 0;
+        fg.total_accumulated_time = 0;
+        fg.isr_lock = false;
         
         // 更新速度档位
         if(fan_speed_runtime.auto_mode) {
@@ -327,6 +232,15 @@ void fan_speed_control_task(void *param)
             if(fan_speed_runtime.real_speed < table_size) {
                 fan_speed_runtime.target_rpm = rpm_table[fan_speed_runtime.real_speed];
             }
+        }
+        
+        // 计算转速
+        if(total_time_us == 0 || pulse_cnt == 0) {
+            fan_speed_runtime.realtime_rpm = 0;
+        } else {
+            // RPM = (脉冲数 / 每转脉冲数) * (60 * 1000000微秒/分钟) / 总时间微秒
+            fan_speed_runtime.realtime_rpm = 
+                (pulse_cnt * 60 * 1000000) / (FAN_FG_PULSE_PER_CYCLE * total_time_us);
         }
         
         // 滤波处理
@@ -346,15 +260,14 @@ void fan_speed_control_task(void *param)
             fan_speed_runtime.current_duty = FAN_PWM_MAX_DUTY;
         }
         
-        // 使用Timer9设置PWM输出
+        // 设置PWM输出
         float duty_ratio = (float)fan_speed_runtime.current_duty / FAN_PWM_MAX_DUTY;
-        timer9_pwm_set_duty(duty_ratio);
+        pwmout_write(&fan_pwm, duty_ratio);
         
-        printf("Target: %d RPM, Current: %d RPM, Duty: %.2f%%, Interval: %lu us\r\n", 
+        printf("Target: %d RPM, Current: %d RPM, Duty: %d\r\n", 
                fan_speed_runtime.target_rpm, 
-               fan_speed_runtime.filtered_rpm,
-               duty_ratio * 100,
-               fg_capture.pulse_interval_us);
+               fan_speed_runtime.filtered_rpm, 
+               fan_speed_runtime.current_duty);
     }
 }
 
@@ -419,19 +332,28 @@ void fan_speed_controller_init(const int *table, int size)
 
     // 初始化运行时参数
     memset(&fan_speed_runtime, 0, sizeof(fan_speed_runtime));
-    memset(&fg_capture, 0, sizeof(fg_capture));
-    
     fan_speed_runtime.speed = 1;
     fan_speed_runtime.auto_speed = 1;
-
-    // 初始化Timer9 PWM输出
-    timer9_pwm_init();
     
-    // 初始化Timer8 FG信号捕获
-    timer8_fg_capture_init();
+    memset(&fg, 0, sizeof(fg));
+    fg.is_first_edge = true;
+    fg.last_pulse_interval = 0xFFFFFFFF;
 
-    // 初始化超时定时器(Timer4)
-    gtimer_init(&timeout_timer, FAN_TIMEOUT_TIMER);
+    // 初始化PWM输出
+    fan_pwm.pwm_idx = 0;  // 使用Channel 0
+    fan_pwm.period = 0;
+    pwmout_init(&fan_pwm, FAN_PWM_PIN);
+    pwmout_period_us(&fan_pwm, 1000000 / FAN_PWM_FREQ); // 设置PWM周期
+    pwmout_write(&fan_pwm, 0.0); // 初始占空比为0
+
+    // 初始化FG信号捕获
+    gpio_irq_init(&fan_fg_irq, FAN_FG_PIN, fan_fg_isr_handler, 0);
+    gpio_irq_set(&fan_fg_irq, IRQ_RISE, 1); // 上升沿触发
+    gpio_irq_pull_ctrl(&fan_fg_irq, PullUp);
+    gpio_irq_enable(&fan_fg_irq);
+
+    // 初始化超时定时器
+    gtimer_init(&timeout_timer, TIMER4);
 
     // 初始化PID控制器
     pid_control_block_init(&fan_speed_runtime.pcb, PID_KP, PID_KI, PID_KD, 
@@ -443,12 +365,12 @@ void fan_speed_controller_init(const int *table, int size)
         return;
     }
 
-    // 创建改进后的控制任务
-    if(rtos_task_create(&fan_speed_task_handle, "FanSpeedCtrlV2", 
+    // 创建控制任务
+    if(rtos_task_create(&fan_speed_task_handle, "FanSpeedCtrl", 
                        fan_speed_control_task, NULL, 2048, 4) != RTK_SUCCESS) {
         printf("Failed to create fan speed control task\r\n");
     } else {
-        printf("Improved fan speed control task created successfully\r\n");
+        printf("Fan speed control task created successfully\r\n");
     }
 }
 
@@ -468,10 +390,10 @@ void fan_controller_example(void)
 {
     // 初始化风扇控制器
     fan_speed_controller_init(fan_rpm_table, sizeof(fan_rpm_table)/sizeof(fan_rpm_table[0]));
-    
-    // 设置为手动模式，档位1
+
+    // 设置为手动模式，档位2
     fan_speed_set_auto_mode(false);
-    fan_speed_set_speed(1, false);
+    fan_speed_set_speed(3, false);
     
     // 或者设置TE模式，直接指定转速
     // fan_speed_te_set(1800);
@@ -481,7 +403,13 @@ void fan_controller_example(void)
 
 void test_pwm_output(void)
 {
-    timer9_pwm_init();
-    timer9_pwm_set_duty(0.5);  // 50%占空比
+    pwmout_t test_pwm;
+    test_pwm.pwm_idx = 3;
+    test_pwm.period = 0;
+    
+    pwmout_init(&test_pwm, _PB_30);
+    pwmout_period_us(&test_pwm, 250); // 1ms周期
+    pwmout_write(&test_pwm, 0.5);      // 50%占空比
+    
     printf("PWM test output initialized\r\n");
 }
