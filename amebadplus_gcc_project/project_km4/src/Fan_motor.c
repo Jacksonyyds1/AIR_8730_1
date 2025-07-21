@@ -27,7 +27,17 @@ typedef struct {
     bool is_first_edge;     //首次边缘标志
     uint32_t last_pulse_interval; //上一个脉冲间隔
     uint32_t total_accumulated_time; //12个脉冲总累计时间
+
+    uint32_t min_pulse_interval;     // 最小脉冲间隔(抗干扰)
+    uint32_t timeout_timestamp;      // 超时时间戳
+    uint8_t consecutive_noise_cnt;   // 连续噪声计数
+    bool timeout_active;             // 超时定时器是否激活
 } fan_fg_runtime_t;
+
+// 配置参数
+#define FG_MIN_PULSE_INTERVAL_US    2000    // 最小脉冲间隔(对应最高转速限制)
+#define FG_MAX_NOISE_COUNT          3       // 最大连续噪声忽略次数
+#define FG_TIMEOUT_US              100000   // 100ms超时
 
 // 风扇速度运行时数据
 typedef struct {
@@ -133,64 +143,115 @@ int fan_rpm_median_filter(int rpm)
 void timeout_timer_handler(uint32_t id)
 {
     UNUSED(id);
-    // 100ms超时，表示FG信号丢失
-    if(!fg.isr_lock) {
-        fg.is_first_edge = true;
-        fg.pulse_cnt = 0;
-        fan_speed_runtime.realtime_rpm = 0;
-        
-        // 通知任务处理
-        if(fan_speed_sema != NULL) {
-            rtos_sema_give(fan_speed_sema);
+    
+    uint32_t current_time = us_ticker_read();
+    
+    // 检查是否真的超时(避免定时器延迟导致的误判)
+    if (current_time >= fg.timeout_timestamp) {
+        if (!fg.isr_lock) {
+            fg.is_first_edge = true;
+            fg.pulse_cnt = 0;
+            fg.consecutive_noise_cnt = 0;
+            fg.timeout_active = false;
+            
+            // 通知主任务处理超时 - 使用普通的信号量发送
+            if (fan_speed_sema != NULL) {
+                rtos_sema_give(fan_speed_sema);
+            }
+        } else {
+            // 如果正在计算中，延迟10ms再检查
+            gtimer_start_one_shout(&timeout_timer, 10000, timeout_timer_handler, NULL);
         }
+    } else {
+        // 重新设置定时器到正确的超时时间
+        uint32_t remaining_time = fg.timeout_timestamp - current_time;
+        gtimer_start_one_shout(&timeout_timer, remaining_time, timeout_timer_handler, NULL);
     }
 }
 
 //================================ FG信号中断处理 ================================
+// 内联函数 - 重启超时监控
+static inline void restart_timeout_monitor(fan_fg_runtime_t *fg_data, uint32_t current_time)
+{
+    fg_data->timeout_timestamp = current_time + FG_TIMEOUT_US;
+    if (!fg_data->timeout_active) {
+        fg_data->timeout_active = true;
+        // 只在首次启动时启动定时器，避免频繁启停
+        gtimer_stop(&timeout_timer);
+        gtimer_start_one_shout(&timeout_timer, FG_TIMEOUT_US, timeout_timer_handler, NULL);
+    }
+}
 
+// 优化后的中断处理函数
 void fan_fg_isr_handler(uint32_t id, gpio_irq_event event)
 {
     UNUSED(id);
     UNUSED(event);
+    
     uint32_t current_time = us_ticker_read();
     
-    if(fg.isr_lock) {
-        return; // 主循环计算时忽略FG中断
+    // 快速退出检查
+    if (fg.isr_lock) {
+        return;
     }
     
-    if(fg.is_first_edge) {
-        // 忽略第一次边缘，重置参数
+    // 首次边缘处理 - 简化逻辑
+    if (fg.is_first_edge) {
         fg.is_first_edge = false;
         fg.start_time_us = current_time;
         fg.last_pulse_interval = 0xFFFFFFFF;
         fg.total_accumulated_time = 0;
         fg.pulse_cnt = 0;
+        fg.consecutive_noise_cnt = 0;
         
-        // 重启超时定时器
-        gtimer_stop(&timeout_timer);
-        gtimer_start_one_shout(&timeout_timer, 100000, timeout_timer_handler, NULL);
-    } else {
-        uint32_t pulse_interval = current_time - fg.start_time_us;
+        restart_timeout_monitor(&fg, current_time);
+        return;
+    }
+    
+    uint32_t pulse_interval = current_time - fg.start_time_us;
+    
+    // 改进的抗干扰逻辑
+    // 1. 绝对最小间隔检查(硬件物理限制)
+    if (pulse_interval < FG_MIN_PULSE_INTERVAL_US) {
+        fg.consecutive_noise_cnt++;
+        if (fg.consecutive_noise_cnt >= FG_MAX_NOISE_COUNT) {
+            // 连续噪声过多，可能是硬件问题，重置状态
+            fg.is_first_edge = true;
+            fg.consecutive_noise_cnt = 0;
+        }
+        return;
+    }
+    
+    // 2. 相对间隔检查(基于历史数据)
+    if (fg.last_pulse_interval != 0xFFFFFFFF) {
+        // 使用更合理的阈值：不能小于上次间隔的1/3，不能大于3倍
+        uint32_t min_threshold = fg.last_pulse_interval / 3;
+        uint32_t max_threshold = fg.last_pulse_interval * 3;
         
-        // 忽略小于半个上次脉冲宽度的边缘(抗干扰)
-        if(fg.last_pulse_interval == 0xFFFFFFFF || 
-           pulse_interval > fg.last_pulse_interval / 2) {
-            
-            fg.pulse_cnt++;
-            fg.total_accumulated_time += pulse_interval; //累计每个间隔
-            fg.last_pulse_interval = pulse_interval;
-            fg.start_time_us = current_time;
-            
-            // 重启超时定时器
-            gtimer_stop(&timeout_timer);
-            gtimer_start_one_shout(&timeout_timer, 100000, timeout_timer_handler, NULL);
-            
-            // 每圈计算一次转速
-            if(fg.pulse_cnt == FAN_FG_PULSE_PER_CYCLE) {
-                if(fan_speed_sema != NULL) {
-                    rtos_sema_give(fan_speed_sema);
-                }
+        if (pulse_interval < min_threshold || pulse_interval > max_threshold) {
+            fg.consecutive_noise_cnt++;
+            if (fg.consecutive_noise_cnt >= FG_MAX_NOISE_COUNT) {
+                fg.is_first_edge = true;
+                fg.consecutive_noise_cnt = 0;
             }
+            return;
+        }
+    }
+    
+    // 有效脉冲处理
+    fg.consecutive_noise_cnt = 0;  // 重置噪声计数
+    fg.pulse_cnt++;
+    fg.total_accumulated_time += pulse_interval;
+    fg.last_pulse_interval = pulse_interval;
+    fg.start_time_us = current_time;
+    
+    restart_timeout_monitor(&fg, current_time);
+    
+    // 完整周期检测 - 只在需要时发送信号量
+    if (fg.pulse_cnt >= FAN_FG_PULSE_PER_CYCLE) {
+        if (fan_speed_sema != NULL) {
+            // 使用ISR安全的信号量发送
+            rtos_sema_give(fan_speed_sema);
         }
     }
 }
@@ -200,22 +261,28 @@ void fan_fg_isr_handler(uint32_t id, gpio_irq_event event)
 void fan_speed_control_task(void *param)
 {
     UNUSED(param);
+
+    uint32_t pulse_cnt, total_time_us;
+     bool is_timeout = false;
+
     while(1) {
         // 等待信号量，超时时间100ms
         rtos_sema_take(fan_speed_sema, 100);
         
-        // 锁定FG中断，避免在计算过程中被打断
+        // 原子操作获取数据，最小化锁定时间
         fg.isr_lock = true;
-        uint32_t pulse_cnt = fg.pulse_cnt;
-        uint32_t total_time_us = 0;
+        pulse_cnt = fg.pulse_cnt;
+        total_time_us = fg.total_accumulated_time;
+        is_timeout = !fg.timeout_active && (pulse_cnt == 0);
         
-        if(pulse_cnt > 0) {
-            total_time_us = fg.total_accumulated_time;
+        // 只有在完整周期或超时时才重置
+        if (pulse_cnt >= FAN_FG_PULSE_PER_CYCLE || is_timeout) {
+            fg.pulse_cnt = 0;
+            fg.total_accumulated_time = 0;
+            if (is_timeout) {
+                fg.is_first_edge = true;
+            }
         }
-        
-        // 重置计数器
-        fg.pulse_cnt = 0;
-        fg.total_accumulated_time = 0;
         fg.isr_lock = false;
         
         // 更新速度档位
@@ -250,6 +317,13 @@ void fan_speed_control_task(void *param)
         int32_t pid_output = pid_iterate(&fan_speed_runtime.pcb, 
                                         fan_speed_runtime.target_rpm, 
                                         fan_speed_runtime.filtered_rpm);
+        
+        if (is_timeout || total_time_us == 0 || pulse_cnt == 0) {
+            fan_speed_runtime.realtime_rpm = 0;
+        } else if (pulse_cnt >= FAN_FG_PULSE_PER_CYCLE) {
+            fan_speed_runtime.realtime_rpm = 
+                (pulse_cnt * 60 * 1000000) / (FAN_FG_PULSE_PER_CYCLE * total_time_us);
+        }                               
         
         fan_speed_runtime.current_duty = PID_OUTPUT_BIAS + pid_output;
         
@@ -393,7 +467,7 @@ void fan_controller_example(void)
 
     // 设置为手动模式，档位2
     fan_speed_set_auto_mode(false);
-    fan_speed_set_speed(3, false);
+    fan_speed_set_speed(1, false);
     
     // 或者设置TE模式，直接指定转速
     // fan_speed_te_set(1800);
@@ -408,8 +482,8 @@ void test_pwm_output(void)
     test_pwm.period = 0;
     
     pwmout_init(&test_pwm, _PB_30);
-    pwmout_period_us(&test_pwm, 250); // 1ms周期
-    pwmout_write(&test_pwm, 0.5);      // 50%占空比
-    
+    pwmout_period_us(&test_pwm, 250); // 250us周期
+    pwmout_write(&test_pwm, 0.7);      // 70%占空比
+
     printf("PWM test output initialized\r\n");
 }
