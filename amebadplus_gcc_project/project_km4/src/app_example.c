@@ -57,7 +57,7 @@ void app_example(void)
                          NULL, 2048, 2) != RTK_SUCCESS) {
         printf("Failed to create timer event task\n");
     }
-    test_pwm_output();
+    fan_controller_example();
     stepper_motor_init();
     timer_1ms_init();
    	fw_timer_event_CancelAllTimerEvent();

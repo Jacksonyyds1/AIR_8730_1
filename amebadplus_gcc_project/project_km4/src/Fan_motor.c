@@ -467,7 +467,7 @@ void fan_controller_example(void)
 
     // 设置为手动模式，档位2
     fan_speed_set_auto_mode(false);
-    fan_speed_set_speed(1, false);
+    fan_speed_set_speed(4, false);
     
     // 或者设置TE模式，直接指定转速
     // fan_speed_te_set(1800);
@@ -483,7 +483,7 @@ void test_pwm_output(void)
     
     pwmout_init(&test_pwm, _PB_30);
     pwmout_period_us(&test_pwm, 250); // 250us周期
-    pwmout_write(&test_pwm, 0.7);      // 70%占空比
+    pwmout_write(&test_pwm, 0.8);      // 70%占空比
 
     printf("PWM test output initialized\r\n");
 }
