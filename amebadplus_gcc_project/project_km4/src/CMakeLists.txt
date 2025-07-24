@@ -37,8 +37,17 @@ set(private_compile_options)         #private compile_options
 
 #------------------------------#
 # Component private part, user config begin
+ameba_list_append(private_includes
+    ../absolute_encoder
+)
 
 ameba_list_append(private_sources
+    ../absolute_encoder/absolute_encoder.cpp
+    ../absolute_encoder/encoder_map.cpp
+    ../absolute_encoder/smart_search_manager.cpp
+    ../absolute_encoder/position_tracker.cpp
+    ../absolute_encoder/input_preprocessor.cpp
+    ../absolute_encoder/runtime_calibrator.cpp
          main.c
          app_example.c
          multi_button.c
