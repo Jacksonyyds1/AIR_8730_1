@@ -9,6 +9,7 @@
 #include "lvgl.h"
 #include "os_wrapper.h"
 #include "Lcd.h"  // 添加LCD头文件
+#include "lvg_lcd_adapter.h"
 
 // LCD 配置参数 - 根据实际LCD修改
 #define LCD_W               240
@@ -25,7 +26,9 @@ static lv_disp_drv_t g_disp_drv;       // 显示驱动配置
 static lv_disp_draw_buf_t g_disp_buf;  // 绘制缓冲区管理
 static lv_disp_t *g_display = NULL;    // 显示设备句柄
 
-
+// 添加全局控制变量
+static volatile bool lvgl_task_running = false;
+static rtos_task_t lvgl_task_handle = NULL;
 
 // 函数声明
 static void lvgl_flush_cb(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv_color_t *color_p);
@@ -89,22 +92,39 @@ void lvgl_task_handler(void *param)
 {
     (void)param;  // 避免未使用参数警告
     
-    while (1) {
+    while (lvgl_task_running) {
         // 处理LVGL事件和绘制
         uint32_t time = lv_timer_handler();
         
         // 延时，根据实际需求调整
         rtos_time_delay_ms(time);
     }
+    printf("LVGL task stopped\n");
+    lvgl_task_handle = NULL;
+    rtos_task_delete(NULL); 
 }
-
+// 添加任务停止函数
+void lvgl_stop_task(void)
+{
+    if (lvgl_task_running) {
+        lvgl_task_running = false;
+        
+        // 等待任务结束
+        while (lvgl_task_handle != NULL) {
+            rtos_time_delay_ms(10);
+        }
+        
+        printf("LVGL task stopped successfully\n");
+    }
+}
 /**
  * 初始化LVGL和LCD适配器
  * 兼容LVGL 8.3 API，并初始化LCD硬件
  */
 int lvgl_init_with_your_lcd(void)
 {
-    
+    // 设置任务运行标志
+    lvgl_task_running = true;
     // 1. 初始化LVGL
     printf("Initializing LVGL...\n");
     lv_init();
@@ -137,6 +157,7 @@ int lvgl_init_with_your_lcd(void)
                         2048, 
                         4) != 0) {  // 使用具体数值而不是tskIDLE_PRIORITY
         printf("Failed to create LVGL task\n");
+        lvgl_task_running = false;
         return -4;
     }
     

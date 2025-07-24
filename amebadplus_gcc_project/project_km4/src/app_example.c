@@ -10,37 +10,38 @@
 #include "timer_api.h"
 #include "Fan_motor.h"
 
+
 gtimer_t my_timer1;
 /**
  * @brief  timer1 callback function
  */
-static void timer1_callback_handler(void)
+/* static void timer1_callback_handler(void)
 {
     // 1ms定时器回调函数
     fw_timer_event_isr_1ms();  // 调用定时器事件处理函数
-}
+} */
 /**
  * @brief Initialize timer
  */
-static void timer_1ms_init(void)
+/* static void timer_1ms_init(void)
 {
     // Initialize 1ms timer
     gtimer_init(&my_timer1, TIMER1);
 	gtimer_start_periodical(&my_timer1, 1000, (void *)timer1_callback_handler, 0);
-}
+} */
 void test_event_timer_task(void)
 {
     printf("Hello world\n");
 }
 // 创建定时器处理任务
-static void timer_event_task(void *param)
+/* static void timer_event_task(void *param)
 {
     (void)param;  // 避免未使用参数警告
     while(1) {
         fw_timer_event_Handler();  // 处理定时器事件
         rtos_time_delay_ms(1); // 延时1ms
     }
-}
+} */
 /**
  * @brief  Application example function
  * @param  None
@@ -51,30 +52,29 @@ void app_example(void)
     printf("hello world\n");
     printf("Starting stepper motor initialization...\n");
     
-    fw_timer_event_Init();
+   // fw_timer_event_Init();
         // 创建定时器处理任务
-    if (rtos_task_create(NULL, "timer_event_task", timer_event_task, 
-                         NULL, 2048, 2) != RTK_SUCCESS) {
-        printf("Failed to create timer event task\n");
-    }
-    fan_controller_example();
-    stepper_motor_init();
-    timer_1ms_init();
-   	fw_timer_event_CancelAllTimerEvent();
+   // if (rtos_task_create(NULL, "timer_event_task", timer_event_task, 
+   //                     NULL, 2048, 2) != RTK_SUCCESS) {
+   //     printf("Failed to create timer event task\n");
+   // }
+ //   fan_controller_example();
+   // stepper_motor_init();
+    //timer_1ms_init();
+   	//fw_timer_event_CancelAllTimerEvent();
    
     //stepper_motor_set_direction(MOTOR_BASE, Motor_Direction_Forward, 800);
    
     // 2. 初始化任务管理系统
-    task_manager_init();
+    //task_manager_init();
     
-    stepper_motor_set_direction(MOTOR_BASE, Motor_Direction_Forward, 820);
+   // stepper_motor_set_direction(MOTOR_BASE, Motor_Direction_Forward, 800);
     DisplayLCD_Init();
-    lvgl_init_with_your_lcd();
-    create_animation_demo(); 
+
 
     // 3. 启动所有应用任务
-    task_manager_start_all();
-    fw_timer_event_ActiveTimerEvent(1000,test_event_timer_task);
+   // task_manager_start_all();
+   // fw_timer_event_ActiveTimerEvent(1000,test_event_timer_task);
     printf("All tasks started successfully\n");
  
     printf("LCD display initialized successfully\n");

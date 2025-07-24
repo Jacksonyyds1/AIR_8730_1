@@ -13,5 +13,6 @@ void lvgl_demo_label(void);
 
 void create_animation_demo(void);
 
+void lvgl_stop_task(void);
 
 #endif // LVGL_LCD_ADAPTER_H

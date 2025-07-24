@@ -18,8 +18,7 @@
 // GPIO和定时器配置
 #define FAN_PWM_PIN           _PB_30   // PWM输出引脚
 #define FAN_FG_PIN            _PB_31    // FG信号输入引脚
-#define FAN_PWM_TIMER_IDX     4        // 使用Timer4作为fg定时器
-#define FAN_FG_TIMER_IDX      8        // 使用Timer8作为PWM
+
 
 // 函数声明
 void fan_speed_controller_init(const int *table, int size);

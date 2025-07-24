@@ -13,6 +13,7 @@
 #include "ameba_ota.h"
 
 #include "atcmd_service.h"
+
 #ifndef CONFIG_MP_SHRINK
 #include "atcmd_wifi.h"
 #ifdef CONFIG_LWIP_LAYER
