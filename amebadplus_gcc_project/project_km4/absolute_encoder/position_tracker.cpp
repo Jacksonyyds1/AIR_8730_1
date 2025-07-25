@@ -3,6 +3,10 @@
 #include <algorithm>
 #include <cmath>
 
+#ifndef UNUSED
+#define UNUSED(x) (void)(x)
+#endif
+
 namespace AbsoluteEncoder
 {
 
@@ -95,6 +99,7 @@ TrackerEvent PositionTracker::determine_event(uint8_t expected_bit, uint8_t actu
 
 ValidationResult PositionTracker::handle_tracking_event(TrackerEvent event, uint8_t bit, SearchDirection direction, uint16_t &position)
 {
+    UNUSED(bit);
     switch(event)
     {
     case TrackerEvent::MATCH:
@@ -123,6 +128,9 @@ ValidationResult PositionTracker::handle_tracking_event(TrackerEvent event, uint
 
 ValidationResult PositionTracker::handle_lost_event(TrackerEvent event, uint8_t bit, SearchDirection direction, uint16_t &position)
 {
+    UNUSED(event);
+    UNUSED(bit);
+    UNUSED(direction);
     // 在丢失状态时，只能等待外部重新初始化
     position = current_position_;
     return ValidationResult::INVALID;

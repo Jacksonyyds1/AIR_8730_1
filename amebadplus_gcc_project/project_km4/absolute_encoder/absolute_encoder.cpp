@@ -237,7 +237,7 @@ encoder_result_t abs_encoder_process_step_with_signal(encoder_handle_t handle, i
             handle->current_position.relative_position_change += result.encoder_unit_change;
 
             LOGI("Encoder unit completed: change=%d, total_change=%d, signal=%d",
-                 result.encoder_unit_change, handle->current_position.relative_position_change, result.current_signal_value);
+                 (int)result.encoder_unit_change, (int)handle->current_position.relative_position_change, result.current_signal_value);
         }
 
         // 将输入预处理器的方向转换为搜索方向
@@ -399,7 +399,7 @@ static void transition_to_tracking_mode(encoder_handle_t handle, uint32_t found_
     // 初始化位置跟踪器，使用实际的搜索方向
     handle->position_tracker->initialize_position(found_position, search_direction);
 
-    LOGI("Encoder: Switched to tracking mode at position %u\n", found_position);
+    LOGI("Encoder: Switched to tracking mode at position %" PRId32 "\n", found_position);
 }
 
 static void transition_to_search_mode(encoder_handle_t handle)
@@ -591,7 +591,7 @@ bool abs_encoder_config_sampling_point(encoder_handle_t handle, float sampling_r
 
     handle->input_processor->update_config(config);
 
-    LOGD("Sampling point configured: ratio=%.3f, max_steps=%u",
+    LOGD("Sampling point configured: ratio=%.3f, max_steps=%" PRId32,
          sampling_ratio, max_steps);
 
     return true;
