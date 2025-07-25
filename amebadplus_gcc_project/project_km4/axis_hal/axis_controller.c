@@ -3,7 +3,7 @@
 #include <string.h>
 #include <stdio.h>
 
-#include "stepper_motor/stepper_motor.h"
+#include "step_motor.h" 
 #include "logger/logger.h"
 
 #include "axis_coordinate_transform.h"

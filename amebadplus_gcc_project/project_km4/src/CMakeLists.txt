@@ -39,6 +39,7 @@ set(private_compile_options)         #private compile_options
 # Component private part, user config begin
 ameba_list_append(private_includes
     ../absolute_encoder
+    ../axis_hal
 )
 
 ameba_list_append(private_sources
@@ -48,6 +49,10 @@ ameba_list_append(private_sources
     ../absolute_encoder/position_tracker.cpp
     ../absolute_encoder/input_preprocessor.cpp
     ../absolute_encoder/runtime_calibrator.cpp
+    ../axis_hal/axis_controller.c
+    ../axis_hal/axis_coordinate_transform.c
+    ../axis_hal/axis_motion_control.c
+    ../axis_hal/encoder.c
          main.c
          app_example.c
          multi_button.c
