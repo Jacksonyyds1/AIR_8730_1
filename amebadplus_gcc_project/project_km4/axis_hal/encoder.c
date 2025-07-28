@@ -248,8 +248,8 @@ const char* encoder_get_calibration_state_string(runtime_calibration_state_t sta
 void encoder_process_samples(void)
 {
     encoder_sampled_data_t sampled_data;
-    uint32_t start_time, end_time;
-    uint8_t value;
+    //uint32_t start_time, end_time;
+    //uint8_t value;
 
     // 处理所有待处理的采样
     while(stepper_motor_get_encoder_data(&sampled_data, 0) == pdTRUE)

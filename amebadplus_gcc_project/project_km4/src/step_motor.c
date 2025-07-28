@@ -1,4 +1,7 @@
 #include "step_motor.h"
+#include "FreeRTOS.h"
+#include "queue.h"
+#include "task.h"
 #include "platform_autoconf.h"
 
 
@@ -20,6 +23,8 @@ typedef struct {
     uint16_t current_speed;
     uint16_t target_speed;
 } stepper_motor_t;
+
+static QueueHandle_t encoder_sample_queue = NULL;
 
 // --- 全局变量 ---
 static stepper_motor_t stepper_motor[MOTOR_COUNT] = {
@@ -65,7 +70,7 @@ static void stepper_motor_driver(uint8_t index);
 static uint16_t stepper_motor_speed_handler(uint16_t current_speed, uint16_t target_speed, uint8_t accelerate_rate);
 
 // 定时器回调函数
-static void timer_nozzle_handler(void);
+static void timer_neck_handler(void);
 static void timer_base_handler(void);
 
 // --- GPIO初始化 ---
@@ -370,7 +375,7 @@ static void stepper_motor_driver(uint8_t index)
 }
 
 // --- 定时器回调函数 ---
-static void timer_nozzle_handler(void)
+static void timer_neck_handler(void)
 {
     // 执行步进控制
     stepper_motor_driver(MOTOR_NECK);
@@ -588,4 +593,16 @@ uint16_t stepper_motor_calc_accel_step(uint8_t index)
 {
     return (stepper_motor[index].current_speed - MOTOR_MIN_PPS + stepper_motor[index].accelerate_rate - 1) / stepper_motor[index].accelerate_rate + 1;
     }
+}
+// --- 编码器数据获取函数实现 ---
+bool stepper_motor_get_encoder_data(encoder_sampled_data_t *data, int timeout)
+{
+    if(encoder_sample_queue == NULL || data == NULL)
+    {
+        return false; // No queue initialized or invalid parameter
+    }
+
+    // Wait for data to be available in the queue
+    BaseType_t result = xQueueReceive(encoder_sample_queue, data, timeout);
+    return (result == pdTRUE);
 }

@@ -57,6 +57,12 @@ typedef enum {
     Motor_Direction_Stop     = 2
 } Motor_Direction_t;
 
+typedef struct {
+    uint8_t motor_index;
+    uint8_t sampled_signal;
+    Motor_Direction_t direction;
+} encoder_sampled_data_t;
+
 // --- 函数声明 ---
 
 // 基础控制函数
@@ -85,6 +91,7 @@ void stepper_motor_set_speed(uint8_t index, uint16_t target_speed, bool immediat
 void stepper_motor_set_acceleration_rate(uint8_t index, uint8_t accel_rate);
 uint16_t stepper_motor_get_current_speed(uint8_t index);
 uint16_t stepper_motor_calc_accel_step(uint8_t index);
+bool stepper_motor_get_encoder_data(encoder_sampled_data_t *data, int timeout);
 
 #ifdef __cplusplus
 }
