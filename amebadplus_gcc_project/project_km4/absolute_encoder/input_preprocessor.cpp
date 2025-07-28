@@ -27,7 +27,6 @@ InputPreprocessor::InputPreprocessor(const EdgeSamplingConfig &config)
 
 InputPreprocessor::ProcessingResult InputPreprocessor::process_step_with_signal(StepDirection direction, uint8_t sensor_signal)
 {
-    UNUSED(sensor_signal);
     ProcessingResult result;
 
     // 更新当前步数位置
@@ -189,7 +188,6 @@ InputPreprocessor::ProcessingResult InputPreprocessor::handle_tracking(uint8_t s
 
 InputPreprocessor::ProcessingResult InputPreprocessor::handle_backlash_compensation(uint8_t sensor_signal)
 {
-    UNUSED(sensor_signal);
     ProcessingResult result;
 
     if(backlash_compensation_steps_ > 0)
@@ -198,7 +196,7 @@ InputPreprocessor::ProcessingResult InputPreprocessor::handle_backlash_compensat
         result.new_state = ProcessingState::BACKLASH_COMPENSATING;
 
         LOGV("Backlash compensation: %d steps remaining",
-                (int)backlash_compensation_steps_);
+                backlash_compensation_steps_);
     }
     else
     {
@@ -362,7 +360,7 @@ void InputPreprocessor::set_sampling_reference(int32_t step_pos, uint8_t signal_
     steps_since_last_edge_ = 0;
 
     LOGI("Sampling reference set: step=%d, signal=%d, unit=%d",
-           (int)step_pos, (int)signal_val, (int)encoder_unit_pos);
+            step_pos, signal_val, encoder_unit_pos);
 }
 
 void InputPreprocessor::reset()

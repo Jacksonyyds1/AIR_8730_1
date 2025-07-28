@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "absolute_encoder.h"
+#include "absolute_encoder/absolute_encoder.h"
 
 // 队列大小定义（必须是2的幂，用于位运算优化）
 #define ENCODER_QUEUE_SIZE 32

@@ -15,19 +15,24 @@ namespace AbsoluteEncoder
 RuntimeCalibrator::RuntimeCalibrator(const CalibrationConfig &config)
     : config_(config),
       current_state_(CalibrationState::UNCALIBRATED),
+      last_analysis_sample_count_(0),
       current_step_count_(0),
       last_sensor_signal_(0),
-      signal_initialized_(false),
-      last_analysis_sample_count_(0)
+      signal_initialized_(false)
 {
     // 初始化默认校准结果
     last_result_.state = CalibrationState::UNCALIBRATED;
     last_result_.calibrated_steps_per_unit = config_.nominal_steps_per_unit;
     last_result_.confidence_level = 0.0f;
+
+    // 初始化环形缓冲区
+    step_samples_.reserve(config_.max_samples_for_analysis);
+    head_index_ = 0;
 }
 
 void RuntimeCalibrator::reset()
 {
+    head_index_ = 0;
     step_samples_.clear();
     current_state_ = CalibrationState::UNCALIBRATED;
     last_analysis_sample_count_ = 0;
@@ -107,18 +112,19 @@ bool RuntimeCalibrator::perform_calibration_analysis()
     // 计算置信度
     new_result.confidence_level = calculate_confidence_level(step_variance, step_samples_.size());
     LOGI("Calibration result in %d samples: steps_per_unit=%.2f, variance=%.2f, confidence=%.2f",
-        (unsigned int)new_result.sample_count, new_result.calibrated_steps_per_unit, step_variance, new_result.confidence_level);
-    LOGI("Current result %s", new_result.state == CalibrationState::CALIBRATED ? "Accepted" : "Denied");
-    
+        new_result.sample_count, new_result.calibrated_steps_per_unit, step_variance, new_result.confidence_level);
+
     // 验证结果
     if(validate_calibration_result(new_result))
     {
         last_result_ = new_result;
+        LOGI("Accepted calibration result");
         current_state_ = CalibrationState::CALIBRATED;
         return true;
     }
     else
     {
+        LOGI("Denied calibration result");
         current_state_ = CalibrationState::FAILED;
         return false;
     }
@@ -130,13 +136,10 @@ bool RuntimeCalibrator::analyze_step_data(float &mean_steps, float &variance)
     {
         return false;
     }
-    
-    // 仅在分析时，临时拷贝到 vector 中以保证内存连续
-    std::vector<float> temp_samples(step_samples_.begin(), step_samples_.end());
 
     // 使用 CMSIS-DSP 函数
-    arm_mean_f32(temp_samples.data(), temp_samples.size(), &mean_steps);
-    arm_var_f32(temp_samples.data(), temp_samples.size(), &variance);
+    arm_mean_f32(step_samples_.data(), step_samples_.size(), &mean_steps);
+    arm_var_f32(step_samples_.data(), step_samples_.size(), &variance);
     
     return true;
 }
@@ -196,6 +199,20 @@ bool RuntimeCalibrator::force_analyze()
     return perform_calibration_analysis();
 }
 
+void RuntimeCalibrator::add_step_sample(float steps_per_unit)
+{
+    if(step_samples_.size() < config_.max_samples_for_analysis)
+    {
+        step_samples_.push_back(steps_per_unit);
+    }
+    else
+    {
+        // 环形缓冲区已满，覆盖旧数据
+        step_samples_[head_index_] = steps_per_unit;
+        head_index_ = (head_index_ + 1) % config_.max_samples_for_analysis;
+    }
+}
+
 void RuntimeCalibrator::detect_signal_transition(uint8_t new_signal)
 {
     // 如果信号尚未初始化，记录初始信号
@@ -222,33 +239,19 @@ void RuntimeCalibrator::detect_signal_transition(uint8_t new_signal)
             // 如果步数超过容差上限，进行等分处理
             if(current_step_count_ > tolerance_upper_limit)
             {
-                // 计算等分数量（四舍五入）
+                // 估算分割数和每段步数
                 int devider = std::round(current_step_count_ / reference_steps);
+                float steps_per_unit = current_step_count_ / (float)devider;
                 
-                // 计算每个等分的步数
-                float steps_per_unit = current_step_count_ / devider;
-                
-                for(int i = 0; i < devider; i++)
+                for(uint32_t i = 0; i < devider; i++)
                 {
-                    step_samples_.push_back(steps_per_unit);
-
-                    // 限制样本队列大小
-                    if(step_samples_.size() > config_.max_samples_for_analysis)
-                    {
-                        step_samples_.pop_front();
-                    }
+                    add_step_sample(steps_per_unit);
                 }
             }
+            // 否则直接添加当前步数样本
             else
             {
-                // 步数在正常范围内，直接添加
-                step_samples_.push_back((float)current_step_count_);
-                
-                // 限制样本队列大小
-                if(step_samples_.size() > config_.max_samples_for_analysis)
-                {
-                    step_samples_.pop_front();
-                }
+                add_step_sample((float)current_step_count_);
             }
             
             // 如果达到足够样本数，尝试自动分析

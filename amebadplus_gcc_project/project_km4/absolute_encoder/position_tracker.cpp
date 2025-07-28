@@ -99,7 +99,7 @@ TrackerEvent PositionTracker::determine_event(uint8_t expected_bit, uint8_t actu
 
 ValidationResult PositionTracker::handle_tracking_event(TrackerEvent event, uint8_t bit, SearchDirection direction, uint16_t &position)
 {
-    UNUSED(bit);
+    UNUSED(bit); // bit在此状态下不需要使用
     switch(event)
     {
     case TrackerEvent::MATCH:
@@ -128,9 +128,10 @@ ValidationResult PositionTracker::handle_tracking_event(TrackerEvent event, uint
 
 ValidationResult PositionTracker::handle_lost_event(TrackerEvent event, uint8_t bit, SearchDirection direction, uint16_t &position)
 {
-    UNUSED(event);
-    UNUSED(bit);
-    UNUSED(direction);
+    UNUSED(bit); // bit在此状态下不需要使用
+    UNUSED(direction); // direction在此状态下不需要使用
+    UNUSED(event); // 在丢失状态下不处理事件
+    
     // 在丢失状态时，只能等待外部重新初始化
     position = current_position_;
     return ValidationResult::INVALID;

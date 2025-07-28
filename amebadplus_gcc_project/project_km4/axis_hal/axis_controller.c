@@ -3,13 +3,13 @@
 #include <string.h>
 #include <stdio.h>
 
-#include "step_motor.h"
+#include "stepper_motor/stepper_motor.h"
 #include "logger/logger.h"
 
 #include "axis_coordinate_transform.h"
 #include "axis_motion_control.h"
 #include "axis_controller.h"
-//#include "encoder.h"
+#include "encoder.h"
 
 // 内部常量定义
 #define AXIS_ANGLE_TOLERANCE_DEFAULT    0.5f    // 默认位置容差(度)

@@ -1,8 +1,7 @@
-#include "ameba_soc.h"
-#include "os_wrapper.h"
+#include "at32f435_437.h"
 #include "absolute_encoder/absolute_encoder.h"
-#include "step_motor.h"
-
+#include "stepper_motor/stepper_motor.h"
+#include "system_clock/system_clock.h"
 
 #include "FreeRTOS.h"
 #include "semphr.h"

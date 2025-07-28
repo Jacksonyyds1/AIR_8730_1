@@ -3,7 +3,7 @@
 
 #include "axis_motion_control.h"
 #include "axis_coordinate_transform.h"
-#include "step_motor.h"
+#include "stepper_motor/stepper_motor.h"
 #include "encoder.h"
 
 // === 辅助函数实现 ===
