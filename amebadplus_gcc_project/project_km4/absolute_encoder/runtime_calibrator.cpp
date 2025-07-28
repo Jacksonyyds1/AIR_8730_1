@@ -112,7 +112,7 @@ bool RuntimeCalibrator::perform_calibration_analysis()
     // 计算置信度
     new_result.confidence_level = calculate_confidence_level(step_variance, step_samples_.size());
     LOGI("Calibration result in %d samples: steps_per_unit=%.2f, variance=%.2f, confidence=%.2f",
-        new_result.sample_count, new_result.calibrated_steps_per_unit, step_variance, new_result.confidence_level);
+        (int)new_result.sample_count, new_result.calibrated_steps_per_unit, step_variance, new_result.confidence_level);
 
     // 验证结果
     if(validate_calibration_result(new_result))
@@ -243,7 +243,7 @@ void RuntimeCalibrator::detect_signal_transition(uint8_t new_signal)
                 int devider = std::round(current_step_count_ / reference_steps);
                 float steps_per_unit = current_step_count_ / (float)devider;
                 
-                for(uint32_t i = 0; i < devider; i++)
+                for(uint32_t i = 0; i < (uint32_t)devider; i++)
                 {
                     add_step_sample(steps_per_unit);
                 }

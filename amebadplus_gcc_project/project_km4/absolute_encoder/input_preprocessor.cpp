@@ -188,6 +188,7 @@ InputPreprocessor::ProcessingResult InputPreprocessor::handle_tracking(uint8_t s
 
 InputPreprocessor::ProcessingResult InputPreprocessor::handle_backlash_compensation(uint8_t sensor_signal)
 {
+    UNUSED(sensor_signal); // 在回差补偿状态下不处理信号
     ProcessingResult result;
 
     if(backlash_compensation_steps_ > 0)
@@ -196,7 +197,7 @@ InputPreprocessor::ProcessingResult InputPreprocessor::handle_backlash_compensat
         result.new_state = ProcessingState::BACKLASH_COMPENSATING;
 
         LOGV("Backlash compensation: %d steps remaining",
-                backlash_compensation_steps_);
+                (int)backlash_compensation_steps_);
     }
     else
     {
@@ -360,7 +361,7 @@ void InputPreprocessor::set_sampling_reference(int32_t step_pos, uint8_t signal_
     steps_since_last_edge_ = 0;
 
     LOGI("Sampling reference set: step=%d, signal=%d, unit=%d",
-            step_pos, signal_val, encoder_unit_pos);
+            (int)step_pos, (int)signal_val, (int)encoder_unit_pos);
 }
 
 void InputPreprocessor::reset()
