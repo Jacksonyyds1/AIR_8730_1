@@ -1,5 +1,5 @@
 #include "axis_coordinate_transform.h"
-#include "step_motor.h" 
+#include "step_motor.h"
 #include <math.h>
 
 // === 内部辅助函数 ===
@@ -42,7 +42,7 @@ float axis_internal_to_external_angle(axis_handle_t *handle, float internal_angl
     return internal_angle;
 }
 
-int axis_angle_to_motor_steps(axis_handle_t *handle, float internal_angle)
+int axis_internal_angle_to_motor_steps(axis_handle_t *handle, float internal_angle)
 {
     if(!handle) return 0;
     
@@ -79,23 +79,26 @@ uint16_t axis_angle_velocity_to_motor_pps(axis_handle_t *handle, float deg_per_s
     return (uint16_t)motor_pps;
 }
 
-bool axis_is_internal_angle_in_limits(axis_handle_t *handle, float internal_angle)
+bool axis_is_angle_in_limits(axis_handle_t *handle, float angle)
 {
     if(!handle) return false;
     
     if(!handle->config.enable_limits) return true;
     
     // 将外部限位转换为内部限位进行比较
-    float internal_min = axis_external_to_internal_angle(handle, handle->config.min_limit);
-    float internal_max = axis_external_to_internal_angle(handle, handle->config.max_limit);
+    float min_limit, max_limit;
     
     // 确保min < max
-    if(internal_min > internal_max)
+    if(handle->config.min_limit > handle->config.max_limit)
     {
-        float temp = internal_min;
-        internal_min = internal_max;
-        internal_max = temp;
+        min_limit = handle->config.max_limit;
+        max_limit = handle->config.min_limit;
     }
-    
-    return (internal_angle >= internal_min && internal_angle <= internal_max);
+    else
+    {
+        min_limit = handle->config.min_limit;
+        max_limit = handle->config.max_limit;
+    }
+
+    return (angle >= min_limit && angle <= max_limit);
 }

@@ -32,9 +32,10 @@ bool axis_start_motor_movement(axis_handle_t *handle, int target_motor_position,
  * @brief 启动电机速度控制运动
  * @param handle 轴控制器句柄
  * @param velocity 速度(度/秒)，正数向前，负数向后
+ * @param immediate 是否跳过加速过程，立即开始运动
  * @return 成功返回true
  */
-bool axis_start_motor_velocity(axis_handle_t *handle, float velocity);
+bool axis_start_motor_velocity(axis_handle_t *handle, float velocity, bool immediate);
 
 /**
  * @brief 处理运动控制逻辑

@@ -3,13 +3,13 @@
 #include <string.h>
 #include <stdio.h>
 
-#include "step_motor.h" 
+#include "step_motor.h"
 #include "logger/logger.h"
 
 #include "axis_coordinate_transform.h"
 #include "axis_motion_control.h"
 #include "axis_controller.h"
-#include "encoder.h"
+//#include "encoder.h"
 
 // 内部常量定义
 #define AXIS_ANGLE_TOLERANCE_DEFAULT    0.5f    // 默认位置容差(度)
@@ -21,6 +21,11 @@
 static uint16_t convert_speed_to_pps(axis_handle_t *handle, float deg_per_sec)
 {
     return (uint16_t)(deg_per_sec / handle->config.angle_per_encoder_unit * handle->config.motor_steps_per_unit);
+}
+
+static float convert_pps_to_speed(axis_handle_t *handle, uint16_t pps)
+{
+    return (float)pps * handle->config.angle_per_encoder_unit / handle->config.motor_steps_per_unit;
 }
 
 static bool validate_config(const axis_config_t *config)
@@ -197,7 +202,35 @@ float axis_get_target_angle(axis_handle_t *handle)
     return handle->position.target_angle;
 }
 
-bool axis_is_in_position(axis_handle_t *handle, float target_angle)
+float axis_get_current_velocity(axis_handle_t *handle)
+{
+    if(!handle)
+    {
+        return 0.0f;
+    }
+
+    uint16_t current_pps = stepper_motor_get_current_speed(handle->config.motor_index);
+    float current_speed = convert_pps_to_speed(handle, current_pps);
+
+    if(handle->config.mirror_motion)
+    {
+        current_speed = -current_speed; // 如果启用了运动镜像，反转速度
+    }
+    
+    return current_speed;
+}
+
+float axis_get_target_velocity(axis_handle_t *handle)
+{
+    if(!handle)
+    {
+        return 0.0f;
+    }
+    
+    return handle->target_velocity;
+}
+
+bool axis_is_in_position(axis_handle_t *handle, float target_angle, float tolerance)
 {
     if(!handle)
     {
@@ -205,7 +238,12 @@ bool axis_is_in_position(axis_handle_t *handle, float target_angle)
     }
     
     float error = fabsf(handle->position.target_angle - target_angle);
-    return error <= handle->motion_params.position_tolerance;
+    return error <= tolerance;
+}
+
+bool axis_is_arrived(axis_handle_t *handle)
+{
+    return axis_is_in_position(handle, handle->position.target_angle, handle->motion_params.position_tolerance);
 }
 
 bool axis_is_stopped(axis_handle_t *handle)
@@ -227,22 +265,6 @@ bool axis_get_position_info(axis_handle_t *handle, axis_position_t *position)
     
     memcpy(position, &handle->position, sizeof(axis_position_t));
     return true;
-}
-
-float axis_get_motion_progress(axis_handle_t *handle)
-{
-    if(!handle || handle->state != AXIS_STATE_MOVING)
-    {
-        return 1.0f;
-    }
-    
-    if(handle->motion_distance == 0)
-    {
-        return 1.0f;
-    }
-    
-    float current_distance = handle->position.current_angle - handle->start_angle;
-    return fabsf(current_distance) / fabsf(handle->motion_distance);
 }
 
 float axis_get_rotation_range(axis_handle_t *handle)
@@ -364,19 +386,18 @@ axis_result_t axis_move_to_angle(axis_handle_t *handle, float target_angle, floa
     }
 
     // 检查角度是否在限位范围内
-    float internal_angle = axis_external_to_internal_angle(handle, target_angle);
-    if(!axis_is_internal_angle_in_limits(handle, internal_angle))
+    if(!axis_is_angle_in_limits(handle, target_angle))
     {
         return AXIS_RESULT_OUT_OF_RANGE;
     }
 
     // 计算目标电机位置
-    int target_motor_steps = axis_angle_to_motor_steps(handle, internal_angle);
+    float internal_angle = axis_external_to_internal_angle(handle, target_angle);
+    int target_motor_steps = axis_internal_angle_to_motor_steps(handle, internal_angle);
 
     // 设置目标角度
     handle->position.target_angle = target_angle;
-    handle->start_angle = handle->position.current_angle;
-    handle->motion_distance = target_angle - handle->start_angle;
+    handle->target_velocity = speed;
 
     // 启动电机运动 - 实现定位控制逻辑
     handle->target_motor_position = target_motor_steps;
@@ -385,7 +406,7 @@ axis_result_t axis_move_to_angle(axis_handle_t *handle, float target_angle, floa
     uint16_t speed_pps = convert_speed_to_pps(handle, speed);
     
     // 启动电机运动
-    LOGI("Move motor %d to angle %.1f: target_steps=%d, speed=%d", handle->config.motor_index, target_angle, target_motor_steps, speed_pps);
+    LOGD("Move motor %d to angle %.1f: target_steps=%d, speed=%d", handle->config.motor_index, target_angle, target_motor_steps, speed_pps);
     axis_start_motor_movement(handle, target_motor_steps, speed_pps);
 
     handle->state = AXIS_STATE_MOVING;
@@ -403,7 +424,7 @@ axis_result_t axis_move_relative(axis_handle_t *handle, float angle_offset, floa
     return axis_move_to_angle(handle, target_angle, speed);
 }
 
-axis_result_t axis_move_velocity(axis_handle_t *handle, float velocity_deg_per_sec)
+axis_result_t axis_move_velocity(axis_handle_t *handle, float velocity_deg_per_sec, bool immediate)
 {
     if(!handle)
     {
@@ -415,8 +436,28 @@ axis_result_t axis_move_velocity(axis_handle_t *handle, float velocity_deg_per_s
         return AXIS_RESULT_NOT_INITIALIZED;
     }
 
+    // 基于设定方向检查限位
+    if(handle->config.enable_limits)
+    {
+        if(handle->position.current_angle <= handle->config.min_limit && velocity_deg_per_sec < 0)
+        {
+            return AXIS_RESULT_OUT_OF_RANGE; // 运动超出限位
+        }
+
+        if(handle->position.current_angle >= handle->config.max_limit && velocity_deg_per_sec > 0)
+        {
+            return AXIS_RESULT_OUT_OF_RANGE; // 运动超出限位
+        }
+    }
+
     // 启动速度控制
-    if(axis_start_motor_velocity(handle, velocity_deg_per_sec))
+    if(convert_speed_to_pps(handle, velocity_deg_per_sec) < MOTOR_MIN_PPS)
+    {
+        axis_stop(handle, immediate);
+        handle->state = AXIS_STATE_IDLE;
+        return AXIS_RESULT_SUCCESS;
+    }
+    else if(axis_start_motor_velocity(handle, velocity_deg_per_sec, immediate))
     {
         if(velocity_deg_per_sec == 0)
         {
@@ -483,8 +524,7 @@ static void process_init_positioning(axis_handle_t *handle)
 static void process_init_return(axis_handle_t *handle)
 {
     float zero_angle = axis_motor_steps_to_angle(handle, 0);
-    zero_angle = axis_internal_to_external_angle(handle, zero_angle);
-    if(axis_is_internal_angle_in_limits(handle, zero_angle))
+    if(axis_is_angle_in_limits(handle, zero_angle))
     {
         axis_move_to_angle(handle, zero_angle, AXIS_POSITIONING_SPEED);
     }
@@ -538,7 +578,7 @@ void axis_update(axis_handle_t *handle)
 
     case AXIS_STATE_INIT_RETURN:
         process_init_return(handle);
-        LOGI("Axis %d: returning to initial position", handle->config.motor_index);
+        LOGD("Axis %d: returning to initial position", handle->config.motor_index);
         break;
 
     case AXIS_STATE_IDLE:

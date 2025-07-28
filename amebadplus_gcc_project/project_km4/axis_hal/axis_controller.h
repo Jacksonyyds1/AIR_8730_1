@@ -73,13 +73,9 @@ typedef struct
     axis_state_t state;
     axis_position_t position;
     axis_motion_params_t motion_params;
-
-    // 运动控制
-    float start_angle;               // 运动起始角度
-    float motion_distance;           // 运动距离
-    uint32_t motion_start_time;      // 运动开始时间
     
-    // 定位控制相关
+    // 控制相关
+    float target_velocity;           // 运动速度
     int target_motor_position;       // 目标电机位置（步数）
     bool positioning_active;         // 定位是否激活
     
@@ -146,9 +142,10 @@ axis_result_t axis_move_relative(axis_handle_t *handle, float angle_offset, floa
  * @brief 以指定速度连续移动
  * @param handle 轴控制器句柄
  * @param velocity_deg_per_sec 速度(度/秒)，正数向前，负数向后
+ * @param immediate 是否跳过加速过程，立即开始运动
  * @return 运动结果
  */
-axis_result_t axis_move_velocity(axis_handle_t *handle, float velocity_deg_per_sec);
+axis_result_t axis_move_velocity(axis_handle_t *handle, float velocity_deg_per_sec, bool immediate);
 
 /**
  * @brief 停止运动
@@ -182,12 +179,33 @@ float axis_get_current_angle(axis_handle_t *handle);
 float axis_get_target_angle(axis_handle_t *handle);
 
 /**
- * @brief 检查是否到达目标位置
+ * @brief 获取当前速度
+ * @param handle 轴控制器句柄
+ * @return 当前速度(度/秒)
+ */
+float axis_get_current_velocity(axis_handle_t *handle);
+
+/**
+ * @brief 获取目标速度
+ * @param handle 轴控制器句柄
+ * @return 目标速度(度/秒)
+ */
+float axis_get_target_velocity(axis_handle_t *handle);
+
+/**
+ * @brief 检查是否位于目标位置
  * @param handle 轴控制器句柄
  * @param target_angle 目标角度(度)
  * @return 是否到位
  */
-bool axis_is_in_position(axis_handle_t *handle, float target_angle);
+bool axis_is_in_position(axis_handle_t *handle, float target_angle, float tolerance);
+
+/**
+ * @brief 检查是否到达目标位置
+ * @param handle 轴控制器句柄
+ * @return 是否到位
+ */
+bool axis_is_arrived(axis_handle_t *handle);
 
 /**
  * @brief 检查轴是否停止
@@ -203,13 +221,6 @@ bool axis_is_stopped(axis_handle_t *handle);
  * @return 是否成功
  */
 bool axis_get_position_info(axis_handle_t *handle, axis_position_t *position);
-
-/**
- * @brief 获取运动进度 (0.0 - 1.0)
- * @param handle 轴控制器句柄
- * @return 运动进度百分比
- */
-float axis_get_motion_progress(axis_handle_t *handle);
 
 /**
  * @brief 获取旋转范围

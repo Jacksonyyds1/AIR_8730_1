@@ -33,7 +33,7 @@ float axis_external_to_internal_angle(axis_handle_t *handle, float external_angl
  * @param internal_angle 内部角度
  * @return 电机步数
  */
-int axis_angle_to_motor_steps(axis_handle_t *handle, float internal_angle);
+int axis_internal_angle_to_motor_steps(axis_handle_t *handle, float internal_angle);
 
 /**
  * @brief 将电机步数转换为内部角度
@@ -52,12 +52,12 @@ float axis_motor_steps_to_angle(axis_handle_t *handle, int motor_steps);
 uint16_t axis_angle_velocity_to_motor_pps(axis_handle_t *handle, float deg_per_sec);
 
 /**
- * @brief 检查内部角度是否在限位范围内
+ * @brief 检查给定角度是否在限位范围内
  * @param handle 轴控制器句柄
- * @param internal_angle 内部角度
+ * @param angle 角度
  * @return true=在范围内，false=超出范围
  */
-bool axis_is_internal_angle_in_limits(axis_handle_t *handle, float internal_angle);
+bool axis_is_angle_in_limits(axis_handle_t *handle, float angle);
 
 #ifdef __cplusplus
 }

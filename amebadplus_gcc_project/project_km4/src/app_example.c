@@ -9,7 +9,8 @@
 #include "lvg_lcd_adapter.h"
 #include "timer_api.h"
 #include "Fan_motor.h"
-
+//#include "../absolute_encoder/absolute_encoder.h"
+#include "absolute_encoder.h"
 gtimer_t my_timer1;
 /**
  * @brief  timer1 callback function

@@ -3,7 +3,7 @@
 
 #include "axis_motion_control.h"
 #include "axis_coordinate_transform.h"
-#include "step_motor.h" 
+#include "step_motor.h"
 #include "encoder.h"
 
 // === 辅助函数实现 ===
@@ -50,12 +50,17 @@ bool axis_start_motor_movement(axis_handle_t *handle, int target_motor_position,
     return true;
 }
 
-bool axis_start_motor_velocity(axis_handle_t *handle, float velocity)
+bool axis_start_motor_velocity(axis_handle_t *handle, float velocity, bool immediate)
 {
     if(!handle) return false;
     
     // 停止定位控制
     handle->positioning_active = false;
+
+    if(handle->config.mirror_motion)
+    {
+        velocity = -velocity; // 如果启用了运动镜像，反转速度
+    }
     
     motor_direction_t direction;
     if(velocity > 0)
@@ -69,12 +74,12 @@ bool axis_start_motor_velocity(axis_handle_t *handle, float velocity)
     }
     else
     {
-        stepper_motor_stop(handle->config.motor_index, false, false);
+        stepper_motor_stop(handle->config.motor_index, false, immediate);
         return true;
     }
     
     uint16_t motor_pps = axis_angle_velocity_to_motor_pps(handle, velocity);
-    stepper_motor_set_speed(handle->config.motor_index, motor_pps, false);
+    stepper_motor_set_speed(handle->config.motor_index, motor_pps, immediate);
     stepper_motor_set_direction(handle->config.motor_index, direction, motor_pps);
     
     return true;
@@ -96,8 +101,15 @@ void axis_process_motion_control(axis_handle_t *handle)
         // 计算从当前速度减速到最小速度需要的步数
         uint16_t steps_to_decelerate = stepper_motor_calc_accel_step(handle->config.motor_index);
         
+        // 如果已经到位，直接停止
+        if(remaining_steps == 0)
+        {
+            handle->positioning_active = false;
+            stepper_motor_stop(handle->config.motor_index, false, true);
+            LOGI("Motor %d stopped: current_position=%d", handle->config.motor_index, current_position);
+        }
         // 如果剩余步数小于等于减速步数，开始减速
-        if(remaining_steps <= steps_to_decelerate + 1)
+        else if(remaining_steps <= steps_to_decelerate)
         {
             handle->positioning_active = false;
             stepper_motor_stop(handle->config.motor_index, false, false);

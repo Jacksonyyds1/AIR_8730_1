@@ -1,5 +1,6 @@
 #include "ameba_soc.h"
-#include "absolute_encoder.h"  
+#include "os_wrapper.h"
+#include "absolute_encoder/absolute_encoder.h"
 #include "step_motor.h"
 
 
@@ -153,11 +154,11 @@ void encoder_init(void)
     runtime_config.tolerance_ratio = 0.3f;                  // 校准容差比例 (0.0-1.0)
     runtime_config.min_samples_for_calibration = 10;        // 校准所需最小样本数
     
-    runtime_config.max_samples_for_analysis = 60;           // 分析用最大样本数
+    runtime_config.max_samples_for_analysis = 64;           // 分析用最大样本数
     runtime_config.nominal_steps_per_unit = NECK_MOTOR_STEPS_PER_DEGREE / ENCODER_UNITS_PER_DEG;
     abs_encoder_config_runtime_calibration(encoder_neck_handle, &runtime_config);
 
-    runtime_config.max_samples_for_analysis = 120;           // 分析用最大样本数
+    runtime_config.max_samples_for_analysis = 128;           // 分析用最大样本数
     runtime_config.nominal_steps_per_unit = BASE_MOTOR_STEPS_PER_DEGREE / ENCODER_UNITS_PER_DEG;
     abs_encoder_config_runtime_calibration(encoder_base_handle, &runtime_config);
 }
@@ -256,7 +257,7 @@ void encoder_process_samples(void)
     uint8_t value;
 
     // 处理所有待处理的采样
-    while(stepper_motor_get_encoder_data(&sampled_data, pdMS_TO_TICKS(1)))
+    while(stepper_motor_get_encoder_data(&sampled_data, 0) == pdTRUE)
     {
         // 从队列取出数据
         encoder_handle_t encoder_handle = encoder_get_handle(sampled_data.motor_index);
