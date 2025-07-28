@@ -15,10 +15,11 @@ namespace AbsoluteEncoder
 RuntimeCalibrator::RuntimeCalibrator(const CalibrationConfig &config)
     : config_(config),
       current_state_(CalibrationState::UNCALIBRATED),
-      last_analysis_sample_count_(0),
       current_step_count_(0),
       last_sensor_signal_(0),
-      signal_initialized_(false)
+      signal_initialized_(false),
+      last_analysis_sample_count_(0)
+      
 {
     // 初始化默认校准结果
     last_result_.state = CalibrationState::UNCALIBRATED;

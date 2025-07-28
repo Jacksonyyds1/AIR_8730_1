@@ -145,13 +145,13 @@ private:
 
     // 步数样本数据
     std::vector<float> step_samples_;   // 步数跟踪（用于原始数据处理）
-    size_t head_index_;    
-    uint16_t last_analysis_sample_count_;             
-    // 当前编码器单位的累计步数
+    size_t head_index_;                 // 环形缓冲区头索引
+    uint16_t current_step_count_;       // 当前编码器单位的累计步数
     uint8_t last_sensor_signal_;        // 上次的传感器信号
     bool signal_initialized_;           // 信号是否已初始化
 
-     uint16_t current_step_count_; 
+    // 分析相关
+    uint16_t last_analysis_sample_count_;
 
     // ============ 核心分析方法 ============
 

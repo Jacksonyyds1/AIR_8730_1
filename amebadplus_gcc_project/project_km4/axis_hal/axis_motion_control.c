@@ -3,7 +3,7 @@
 
 #include "axis_motion_control.h"
 #include "axis_coordinate_transform.h"
-#include "stepper_motor/stepper_motor.h"
+#include "step_motor.h"
 #include "encoder.h"
 
 // === 辅助函数实现 ===
@@ -27,7 +27,7 @@ bool axis_start_motor_movement(axis_handle_t *handle, int target_motor_position,
     if(!handle) return false;
     
     int current_position = stepper_motor_get_position(handle->config.motor_index);
-    motor_direction_t direction;
+    Motor_Direction_t direction;
     
     if(target_motor_position > current_position)
     {
@@ -62,7 +62,7 @@ bool axis_start_motor_velocity(axis_handle_t *handle, float velocity, bool immed
         velocity = -velocity; // 如果启用了运动镜像，反转速度
     }
     
-    motor_direction_t direction;
+    Motor_Direction_t direction;
     if(velocity > 0)
     {
         direction = Motor_Direction_Forward;
@@ -96,7 +96,7 @@ void axis_process_motion_control(axis_handle_t *handle)
         int remaining_steps = abs(handle->target_motor_position - current_position);
         
         // 获取当前速度用于计算减速距离
-        uint16_t current_speed = stepper_motor_get_current_speed(handle->config.motor_index);
+        //uint16_t current_speed = stepper_motor_get_current_speed(handle->config.motor_index);
         
         // 计算从当前速度减速到最小速度需要的步数
         uint16_t steps_to_decelerate = stepper_motor_calc_accel_step(handle->config.motor_index);

@@ -29,7 +29,7 @@ static stepper_motor_t stepper_motor[MOTOR_COUNT] = {
         100, 0, Motor_Direction_Stop, Motor_Direction_Stop,
         0, 0, 
         0, 0
-    }, // MOTOR_NOZZLE
+    }, // MOTOR_NECK
     {
         Motor_State_Stop, Motor_Running_Type_Positioning, 
         false, 
@@ -74,13 +74,13 @@ void stepper_motor_gpio_init(void)
 
         // 先将引脚配置为GPIO功能，取消SPI功能
     printf("GPIO init: Configuring pins as GPIO...\n");
-    
-    // MOTOR_NOZZLE 引脚
- /*    Pinmux_Config(MOTOR_NOZZLE_A_PLUS, PINMUX_FUNCTION_GPIO);
-    Pinmux_Config(MOTOR_NOZZLE_B_PLUS, PINMUX_FUNCTION_GPIO);
-    Pinmux_Config(MOTOR_NOZZLE_A_MINUS, PINMUX_FUNCTION_GPIO);
-    Pinmux_Config(MOTOR_NOZZLE_B_MINUS, PINMUX_FUNCTION_GPIO); */
-    
+
+    // MOTOR_NECK 引脚
+    Pinmux_Config(MOTOR_NECK_A_PLUS, PINMUX_FUNCTION_GPIO);
+    Pinmux_Config(MOTOR_NECK_B_PLUS, PINMUX_FUNCTION_GPIO);
+    Pinmux_Config(MOTOR_NECK_A_MINUS, PINMUX_FUNCTION_GPIO);
+    Pinmux_Config(MOTOR_NECK_B_MINUS, PINMUX_FUNCTION_GPIO);
+
     // MOTOR_BASE 引脚
     Pinmux_Config(MOTOR_BASE_A_PLUS, PINMUX_FUNCTION_GPIO);
     Pinmux_Config(MOTOR_BASE_B_PLUS, PINMUX_FUNCTION_GPIO);
@@ -89,18 +89,18 @@ void stepper_motor_gpio_init(void)
 
      printf("GPIO init: Pins configured as GPIO\n");
 
-/*     // MOTOR_NOZZLE GPIO初始化
-    gpio_init(&motor_gpio[MOTOR_NOZZLE][0], MOTOR_NOZZLE_A_PLUS);
-    gpio_init(&motor_gpio[MOTOR_NOZZLE][1], MOTOR_NOZZLE_B_PLUS);
-    gpio_init(&motor_gpio[MOTOR_NOZZLE][2], MOTOR_NOZZLE_A_MINUS);
-    gpio_init(&motor_gpio[MOTOR_NOZZLE][3], MOTOR_NOZZLE_B_MINUS); */
-    
- /*    for(int i = 0; i < 4; i++) {
-        gpio_dir(&motor_gpio[MOTOR_NOZZLE][i], PIN_OUTPUT);
-        gpio_mode(&motor_gpio[MOTOR_NOZZLE][i], PullNone);
-        gpio_write(&motor_gpio[MOTOR_NOZZLE][i], 0);
-    } */
-    
+    // MOTOR_NECK GPIO初始化
+    gpio_init(&motor_gpio[MOTOR_NECK][0], MOTOR_NECK_A_PLUS);
+    gpio_init(&motor_gpio[MOTOR_NECK][1], MOTOR_NECK_B_PLUS);
+    gpio_init(&motor_gpio[MOTOR_NECK][2], MOTOR_NECK_A_MINUS);
+    gpio_init(&motor_gpio[MOTOR_NECK][3], MOTOR_NECK_B_MINUS);
+
+    for(int i = 0; i < 4; i++) {
+        gpio_dir(&motor_gpio[MOTOR_NECK][i], PIN_OUTPUT);
+        gpio_mode(&motor_gpio[MOTOR_NECK][i], PullNone);
+        gpio_write(&motor_gpio[MOTOR_NECK][i], 0);
+    }
+
     // MOTOR_BASE GPIO初始化
     gpio_init(&motor_gpio[MOTOR_BASE][0], MOTOR_BASE_A_PLUS);
     gpio_init(&motor_gpio[MOTOR_BASE][1], MOTOR_BASE_B_PLUS);
@@ -120,9 +120,9 @@ void stepper_motor_timer_init(void)
 {
     printf("Timer init: Enabling timer clocks...\n");
 
-    // 初始化MOTOR_NOZZLE定时器
-/*     gtimer_init(&motor_timer[MOTOR_NOZZLE], MOTOR_TIMER_NOZZLE);
-    printf("Timer init: MOTOR_NOZZLE timer initialized\n"); */
+    // 初始化MOTOR_NECK定时器
+/*     gtimer_init(&motor_timer[MOTOR_NECK], MOTOR_TIMER_NOZZLE);
+    printf("Timer init: MOTOR_NECK timer initialized\n"); */
     
     // 初始化MOTOR_BASE定时器  
     gtimer_init(&motor_timer[MOTOR_BASE], MOTOR_TIMER_BASE);
@@ -140,9 +140,9 @@ static void stepper_motor_start_timer(uint8_t index)
     uint32_t period_us = (STEP_TICKS_MAX - stepper_motor[index].current_speed)*10 ; // 10us基准
     if(period_us < 100) period_us = 100; // 最小100us，避免过快
     
-    if(index == MOTOR_NOZZLE) {
-        gtimer_start_periodical(&motor_timer[MOTOR_NOZZLE], period_us, 
-                               (void*)timer_nozzle_handler, MOTOR_NOZZLE);
+    if(index == MOTOR_NECK) {
+        gtimer_start_periodical(&motor_timer[MOTOR_NECK], period_us,
+                               (void*)timer_neck_handler, MOTOR_NECK);
     } else if(index == MOTOR_BASE) {
         gtimer_start_periodical(&motor_timer[MOTOR_BASE], period_us,
                                (void*)timer_base_handler, MOTOR_BASE);
@@ -373,21 +373,21 @@ static void stepper_motor_driver(uint8_t index)
 static void timer_nozzle_handler(void)
 {
     // 执行步进控制
-    stepper_motor_driver(MOTOR_NOZZLE);
+    stepper_motor_driver(MOTOR_NECK);
     
     // 动态调整定时器周期
-    uint32_t new_period_us = (STEP_TICKS_MAX - stepper_motor[MOTOR_NOZZLE].current_speed) * 10;
+    uint32_t new_period_us = (STEP_TICKS_MAX - stepper_motor[MOTOR_NECK].current_speed) * 10;
     if(new_period_us < 100) new_period_us = 100;
     
     // 如果电机停止且速度为0，停止定时器
-    if(stepper_motor[MOTOR_NOZZLE].state == Motor_State_Stop && 
-       stepper_motor[MOTOR_NOZZLE].current_speed == 0) {
-        stepper_motor_stop_timer(MOTOR_NOZZLE);
+    if(stepper_motor[MOTOR_NECK].state == Motor_State_Stop &&
+       stepper_motor[MOTOR_NECK].current_speed == 0) {
+        stepper_motor_stop_timer(MOTOR_NECK);
     } else {
         // 重新启动定时器以调整周期
-        gtimer_stop(&motor_timer[MOTOR_NOZZLE]);
-        gtimer_start_periodical(&motor_timer[MOTOR_NOZZLE], new_period_us,
-                               (void*)timer_nozzle_handler, MOTOR_NOZZLE);
+        gtimer_stop(&motor_timer[MOTOR_NECK]);
+        gtimer_start_periodical(&motor_timer[MOTOR_NECK], new_period_us,
+                               (void*)timer_neck_handler, MOTOR_NECK);
     }
 }
 
@@ -466,13 +466,25 @@ void stepper_motor_set_target_position(uint8_t index, int target_position)
     }
 }
 
-void stepper_motor_stop(uint8_t index, bool motor_break)
+void stepper_motor_stop(uint8_t index, bool motor_break,bool emergency)
 {
     if(index >= MOTOR_COUNT) return;
     
     stepper_motor[index].motor_break = motor_break;
-    stepper_motor[index].state = Motor_State_Stopping;
+
+    if(emergency){
+        stepper_motor[index].current_speed = 0;
+        stepper_motor[index].accelerate_step = 0;
+        stepper_motor[index].state = Motor_State_Stop;
+        stepper_motor[index].target_direction = Motor_Direction_Stop;
+
+    }
+    else{
+        stepper_motor[index].state = Motor_State_Stopping;
+        stepper_motor[index].accelerate_step = 0;
+    }
     stepper_motor[index].target_direction = Motor_Direction_Stop;
+
 }
 
 void stepper_motor_set_direction(uint8_t index, Motor_Direction_t target_direction, uint16_t target_speed)
@@ -488,18 +500,18 @@ void stepper_motor_set_direction(uint8_t index, Motor_Direction_t target_directi
     }
 }
 
-void stepper_motor_set_sync_target(int nozzle_target, int base_target, uint16_t speed)
+void stepper_motor_set_sync_target(int neck_target, int base_target, uint16_t speed)
 {
-    stepper_motor[MOTOR_NOZZLE].running_type = Motor_Running_Type_Positioning;
-    stepper_motor[MOTOR_NOZZLE].target_position = nozzle_target;
-    stepper_motor[MOTOR_NOZZLE].target_speed = speed;
-    
+    stepper_motor[MOTOR_NECK].running_type = Motor_Running_Type_Positioning;
+    stepper_motor[MOTOR_NECK].target_position = neck_target;
+    stepper_motor[MOTOR_NECK].target_speed = speed;
+
     stepper_motor[MOTOR_BASE].running_type = Motor_Running_Type_Positioning;
     stepper_motor[MOTOR_BASE].target_position = base_target;
     stepper_motor[MOTOR_BASE].target_speed = speed;
-    
-    if(nozzle_target != stepper_motor[MOTOR_NOZZLE].position) {
-        stepper_motor_start_timer(MOTOR_NOZZLE);
+
+    if(neck_target != stepper_motor[MOTOR_NECK].position) {
+        stepper_motor_start_timer(MOTOR_NECK);
     }
     if(base_target != stepper_motor[MOTOR_BASE].position) {
         stepper_motor_start_timer(MOTOR_BASE);
@@ -508,15 +520,15 @@ void stepper_motor_set_sync_target(int nozzle_target, int base_target, uint16_t 
 
 bool stepper_motor_is_sync_complete(void)
 {
-    return (stepper_motor[MOTOR_NOZZLE].state == Motor_State_Stop &&
+    return (stepper_motor[MOTOR_NECK].state == Motor_State_Stop &&
             stepper_motor[MOTOR_BASE].state == Motor_State_Stop &&
-            stepper_motor[MOTOR_NOZZLE].position == stepper_motor[MOTOR_NOZZLE].target_position &&
+            stepper_motor[MOTOR_NECK].position == stepper_motor[MOTOR_NECK].target_position &&
             stepper_motor[MOTOR_BASE].position == stepper_motor[MOTOR_BASE].target_position);
 }
 
 bool stepper_motor_all_stopped(void)
 {
-    return (stepper_motor[MOTOR_NOZZLE].state == Motor_State_Stop &&
+    return (stepper_motor[MOTOR_NECK].state == Motor_State_Stop &&
             stepper_motor[MOTOR_BASE].state == Motor_State_Stop);
 }
 
@@ -526,4 +538,54 @@ void stepper_motor_set_speed_profile(uint8_t index, uint16_t max_speed, uint8_t 
     
     stepper_motor[index].target_speed = max_speed;
     stepper_motor[index].accelerate_rate = accel_rate;
+}
+
+void stepper_motor_set_speed(uint8_t index, uint16_t target_speed, bool immediate)
+{
+    if(target_speed < MOTOR_MIN_PPS)
+    {
+        stepper_motor_stop(index, false, immediate);
+        return; // Invalid speed, stop motor
+    }
+
+    if(index < MOTOR_COUNT)
+    {
+        stepper_motor[index]. target_speed = target_speed;
+        if(immediate)
+        {
+            stepper_motor[index].target_speed = target_speed;
+            stepper_motor[index].accelerate_step = stepper_motor_calc_accel_step(index);
+        }
+    }
+}
+void stepper_motor_set_acceleration_rate(uint8_t index, uint8_t accel_rate)
+{
+    if(index < MOTOR_COUNT)
+    {
+        stepper_motor[index].accelerate_rate = accel_rate;
+        stepper_motor[index].accelerate_step = stepper_motor_calc_accel_step(index);
+    }
+}
+uint16_t stepper_motor_get_current_speed(uint8_t index)
+{
+    if(index < MOTOR_COUNT)
+    {
+        return stepper_motor[index].current_speed;
+    }
+    return 0;
+}
+uint16_t stepper_motor_calc_accel_step(uint8_t index)
+{
+    if(stepper_motor[index].current_speed == 0)
+    {
+        return 0; // No acceleration
+    }
+    else if(stepper_motor[index].current_speed <= MOTOR_MIN_PPS)
+    {
+        return 1; // Minimum speed
+    }
+    else
+{
+    return (stepper_motor[index].current_speed - MOTOR_MIN_PPS + stepper_motor[index].accelerate_rate - 1) / stepper_motor[index].accelerate_rate + 1;
+    }
 }

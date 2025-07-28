@@ -46,7 +46,7 @@ static int stepper_at_init_hardware(void)
 static const char* get_motor_name(uint8_t index)
 {
     switch (index) {
-    case MOTOR_NOZZLE: return "NOZZLE";
+    case MOTOR_NECK: return "NECK";
     case MOTOR_BASE:   return "BASE";
     default:           return "UNKNOWN";
     }
@@ -146,7 +146,7 @@ static int stepper_at_stop_motor(uint8_t motor_index, bool brake)
         return -1;
     }
     
-    stepper_motor_stop(motor_index, brake);
+    stepper_motor_stop(motor_index, brake,0);
     stepper_at_ctrl.motor_state[motor_index] = STEPPER_AT_STATE_STOPPED;
     
     RTK_LOGI(TAG, "Motor %s: Stopped with %s\r\n", 
@@ -193,14 +193,14 @@ static int stepper_at_sync_move(int nozzle_target, int base_target, uint16_t spe
     
     stepper_motor_set_sync_target(nozzle_target, base_target, speed);
     
-    stepper_at_ctrl.target_position[MOTOR_NOZZLE] = nozzle_target;
+    stepper_at_ctrl.target_position[MOTOR_NECK] = nozzle_target;
     stepper_at_ctrl.target_position[MOTOR_BASE] = base_target;
-    stepper_at_ctrl.speed[MOTOR_NOZZLE] = speed;
+    stepper_at_ctrl.speed[MOTOR_NECK] = speed;
     stepper_at_ctrl.speed[MOTOR_BASE] = speed;
-    stepper_at_ctrl.motor_state[MOTOR_NOZZLE] = STEPPER_AT_STATE_MOVING;
+    stepper_at_ctrl.motor_state[MOTOR_NECK] = STEPPER_AT_STATE_MOVING;
     stepper_at_ctrl.motor_state[MOTOR_BASE] = STEPPER_AT_STATE_MOVING;
     
-    RTK_LOGI(TAG, "Sync move: NOZZLE->%d, BASE->%d at speed %d\r\n", 
+    RTK_LOGI(TAG, "Sync move: NECK->%d, BASE->%d at speed %d\r\n", 
              nozzle_target, base_target, speed);
     
     return 0;

@@ -19,14 +19,14 @@ extern "C" {
 #define MOTOR_COUNT         2           // 电机数量
 
 // 电机索引定义
-#define MOTOR_NOZZLE        0
+#define MOTOR_NECK        0
 #define MOTOR_BASE          1
 
 // GPIO引脚定义 (需根据实际硬件连接修改)
-#define MOTOR_NOZZLE_A_PLUS     PA_12
-#define MOTOR_NOZZLE_B_PLUS     PA_13  
-#define MOTOR_NOZZLE_A_MINUS    PA_14
-#define MOTOR_NOZZLE_B_MINUS    PA_15
+#define MOTOR_NECK_A_PLUS     PA_12
+#define MOTOR_NECK_B_PLUS     PA_13
+#define MOTOR_NECK_A_MINUS    PA_14
+#define MOTOR_NECK_B_MINUS    PA_15
 
 #define MOTOR_BASE_A_PLUS       PB_21
 #define MOTOR_BASE_B_PLUS       PB_20
@@ -34,7 +34,7 @@ extern "C" {
 #define MOTOR_BASE_B_MINUS      PB_18
 
 // 定时器定义
-#define MOTOR_TIMER_NOZZLE      TIMER2
+#define MOTOR_TIMER_NECK      TIMER2
 #define MOTOR_TIMER_BASE        TIMER3
 
 // --- 枚举定义 ---
@@ -66,7 +66,7 @@ int stepper_motor_get_position(uint8_t index);
 void stepper_motor_set_target_position(uint8_t index, int position);
 void stepper_motor_set_position(uint8_t index, int position);
 void stepper_motor_set_direction(uint8_t index, Motor_Direction_t target_direction, uint16_t target_speed);
-void stepper_motor_stop(uint8_t index, bool motor_break);
+void stepper_motor_stop(uint8_t index, bool motor_break,bool emergency);
 
 // 配置函数
 void stepper_motor_set_speed_profile(uint8_t index, uint16_t target_speed, uint8_t accel_rate);
@@ -80,6 +80,11 @@ bool stepper_motor_all_stopped(void);
 void stepper_motor_init(void);
 void stepper_motor_gpio_init(void);
 void stepper_motor_timer_init(void);
+
+void stepper_motor_set_speed(uint8_t index, uint16_t target_speed, bool immediate);
+void stepper_motor_set_acceleration_rate(uint8_t index, uint8_t accel_rate);
+uint16_t stepper_motor_get_current_speed(uint8_t index);
+uint16_t stepper_motor_calc_accel_step(uint8_t index);
 
 #ifdef __cplusplus
 }
