@@ -40,7 +40,6 @@ set(private_compile_options)         #private compile_options
 ameba_list_append(private_includes
     ../absolute_encoder
     ../axis_hal
-    ../posture_controller
 )
 
 ameba_list_append(private_sources
@@ -54,8 +53,6 @@ ameba_list_append(private_sources
     ../axis_hal/axis_coordinate_transform.c
     ../axis_hal/axis_motion_control.c
     ../axis_hal/encoder.c
-    ../posture_controller/hinge_joint.cpp
-    ../posture_controller/posture_controller.cpp
          main.c
          app_example.c
          multi_button.c
@@ -65,6 +62,7 @@ ameba_list_append(private_sources
          Fan_motor.c
          task_manager.c
          lvg_lcd_adapter.c
+         peripheral_wrapper.c
          )
 
 # Component private part, user config end
