@@ -1,4 +1,3 @@
-
 #ifndef PERIPHERAL_WRAPPER_H
 #define PERIPHERAL_WRAPPER_H
 
@@ -21,6 +20,13 @@ typedef enum {
 int peripheral_init_uart(peripheral_id_t uart_id);
 int peripheral_init_spi(peripheral_id_t spi_id);
 int peripheral_init_i2c(peripheral_id_t i2c_id);
+
+// 如果需要声明这些函数，可以添加以下声明
+#ifdef USE_CUSTOM_INIT_FUNCTIONS
+// 声明自定义的初始化函数
+int uart_init_with_name(UARTName uart_name);
+int spi_init_with_name(SPIName spi_name);
+#endif
 
 #ifdef __cplusplus
 }
