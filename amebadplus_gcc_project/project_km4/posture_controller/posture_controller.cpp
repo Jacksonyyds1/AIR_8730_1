@@ -1,13 +1,31 @@
+// RTL8721DCM系统头文件
+#include "ameba_soc.h"
+#include "os_wrapper.h"
+#include "platform_autoconf.h"
+
+// 数学库
+#include "arm_math.h"
+#include <cmath>
+
+// 标准库
+#include <algorithm>
+#include <cstring>
+
+#include "step_motor.h"
+#include "hinge_joint.hpp"
+
 #include <stdint.h>
 #include <stdbool.h>
 
 #include "FreeRTOS.h"
 #include "task.h"
 #include "logger/logger.h"
-#include "step_motor.h"
 
-#include "hinge_joint.hpp"
+
 #include "posture_controller.h"
+
+
+#define sys_tick() xTaskGetTickCount()
 
 PostureController::HingeJoint &axis_system = PostureController::HingeJoint::getInstance();
 static axis_handle_t *base_axis, *neck_axis;
@@ -35,6 +53,7 @@ posture_runtime_t posture_runtime = {
     .base_oscillation_range_deg = 0.0f,
     .base_angle_target_deg = 0.0f,
     .nozzle_elevation_target_deg = 0.0f
+
 };
 
 /**
@@ -443,6 +462,7 @@ void posture_controller_state_process(void)
  */
 void axis_system_task(void *pvParameters)
 {
+    UNUSED(pvParameters);
     TickType_t xLastWakeTime;
     xLastWakeTime = xTaskGetTickCount(); // Initialize the last wake time
 
