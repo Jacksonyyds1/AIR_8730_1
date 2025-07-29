@@ -2,7 +2,8 @@
 #include "absolute_encoder.h"
 #include "step_motor.h"
 
-
+#include "FreeRTOS.h"
+#include "task.h"
 #include "encoder.h"
 
 /*
@@ -64,10 +65,10 @@ typedef struct {
     bool is_initialized;         // 是否已初始化
 } encoder_signal_filter_t;
 
-static encoder_signal_filter_t signal_filters[2] = {
+/* static encoder_signal_filter_t signal_filters[2] = {
     {0, 0, 1, false},  // MOTOR_NECK: 1ms去抖时间
     {0, 0, 1, false}   // MOTOR_BASE: 1ms去抖时间
-};
+}; */
 
 void encoder_enable_simulated_signals(bool enable)
 {
@@ -255,7 +256,7 @@ void encoder_process_samples(void)
     while(stepper_motor_get_encoder_data(&sampled_data, 0) == pdTRUE)
     {
         // 从队列取出数据
-        encoder_handle_t encoder_handle = encoder_get_handle(sampled_data.motor_index);
+        //encoder_handle_t encoder_handle = encoder_get_handle(sampled_data.motor_index);
         if(enable_simulated_signals)
         {
             sampled_data.sampled_signal = read_simulated_signal(sampled_data.motor_index, sampled_data.direction);
