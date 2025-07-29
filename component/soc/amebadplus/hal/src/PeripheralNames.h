@@ -43,9 +43,9 @@ extern "C" {
   * @brief enum UARTName
   */
 typedef enum {
-	UART_0 = (int)UART0_DEV,
-	UART_1 = (int)UART1_DEV,
-	UART_2 = (int)UART2_DEV,
+  UART_0 = (int)UART0_DEV,
+  UART_1 = (int)UART1_DEV,
+  UART_2 = (int)UART2_DEV,
 } UARTName;
 /** @} */
 
