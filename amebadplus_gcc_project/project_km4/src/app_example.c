@@ -69,7 +69,7 @@ void app_example(void)
     //task_manager_init();
     
    // stepper_motor_set_direction(MOTOR_BASE, Motor_Direction_Forward, 800);
-    DisplayLCD_Init();
+    //DisplayLCD_Init();
 
 
     // 3. 启动所有应用任务

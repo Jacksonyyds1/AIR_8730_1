@@ -4,6 +4,7 @@
 #include "task.h"
 #include "platform_autoconf.h"
 #include "ameba_soc.h"
+#include <stdlib.h> 
 
 // --- 步进电机结构体定义 ---
 typedef struct {
@@ -64,6 +65,15 @@ static const uint8_t unipolar_step_sequence[8] = {
     0b0001,  // Step 6
     0b1001   // Step 7
 };
+
+// --- 静态函数声明 ---
+static void stepper_motor_start_timer(uint8_t index);
+static void stepper_motor_stop_timer(uint8_t index);
+static void set_stepper_motor_output(uint8_t index, int position, bool motor_break);
+static void stepper_motor_position_handler(stepper_motor_t *motor);
+static void stepper_motor_direction_handler(stepper_motor_t *motor);
+static void stepper_motor_driver(uint8_t index);
+static uint16_t stepper_motor_speed_handler(uint16_t current_speed, uint16_t target_speed, uint8_t accelerate_rate);
 
 // --- 硬件定时器中断处理函数 ---
 u32 motor_neck_timer_handler(void *data)
@@ -144,14 +154,7 @@ u32 motor_base_timer_handler(void *data)
     return 0;
 }
 
-// --- 静态函数声明 ---
-static void stepper_motor_start_timer(uint8_t index);
-static void stepper_motor_stop_timer(uint8_t index);
-static void set_stepper_motor_output(uint8_t index, int position, bool motor_break);
-static void stepper_motor_position_handler(stepper_motor_t *motor);
-static void stepper_motor_direction_handler(stepper_motor_t *motor);
-static void stepper_motor_driver(uint8_t index);
-static uint16_t stepper_motor_speed_handler(uint16_t current_speed, uint16_t target_speed, uint8_t accelerate_rate);
+
 
 // --- 硬件定时器控制函数 ---
 static void stepper_motor_start_timer(uint8_t index)
@@ -408,12 +411,12 @@ void stepper_motor_gpio_init(void)
 void stepper_motor_init(void)
 {
     // 创建编码器采样队列
-    encoder_sample_queue = xQueueCreate(ENCODER_QUEUE_SIZE, sizeof(encoder_sampled_data_t));
+/*     encoder_sample_queue = xQueueCreate(ENCODER_QUEUE_SIZE_1, sizeof(encoder_sampled_data_t));
     if(encoder_sample_queue == NULL) {
         printf("Failed to create encoder sample queue\n");
         return;
     }
-    
+     */
     // 初始化GPIO
     stepper_motor_gpio_init();
     
@@ -580,4 +583,8 @@ void stepper_motor_set_speed_profile(uint8_t index, uint16_t target_speed, uint8
 {
     stepper_motor_set_speed(index, target_speed, false);
     stepper_motor_set_acceleration_rate(index, accel_rate);
+}
+uint8_t encoder_base_read(void)
+{
+    return 0;
 }

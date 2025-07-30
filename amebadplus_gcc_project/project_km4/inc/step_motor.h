@@ -23,8 +23,9 @@ extern "C" {
 #define ACCEL_DECEL_STEPS       100         // 加减速步数
 #define DEFAULT_ACCEL_RATE      20          // 默认加速度
 
-// 编码器队列配置
-#define ENCODER_QUEUE_SIZE      20          // 编码器数据队列大小
+
+#define ENCODER_QUEUE_SIZE_1      20     
+
 
 // 硬件定时器索引定义
 #define MOTOR_TIMER_NECK_IDX    2           // TIM2用于NECK电机
