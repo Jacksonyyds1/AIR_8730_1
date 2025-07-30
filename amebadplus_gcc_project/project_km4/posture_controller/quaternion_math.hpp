@@ -10,46 +10,6 @@
 #include "vector_math.hpp"
 #include "quaternion_math.hpp"
 
-// 如果CMSIS-DSP版本不支持四元数函数，使用手动实现
-#ifndef ARM_MATH_CM33
-// 四元数乘法替代实现
-inline void arm_quaternion_product_single_f32_fallback(
-    const float32_t *qa, const float32_t *qb, float32_t *result)
-{
-    result[0] = qa[0]*qb[0] - qa[1]*qb[1] - qa[2]*qb[2] - qa[3]*qb[3];
-    result[1] = qa[0]*qb[1] + qa[1]*qb[0] + qa[2]*qb[3] - qa[3]*qb[2];
-    result[2] = qa[0]*qb[2] - qa[1]*qb[3] + qa[2]*qb[0] + qa[3]*qb[1];
-    result[3] = qa[0]*qb[3] + qa[1]*qb[2] - qa[2]*qb[1] + qa[3]*qb[0];
-}
-
-// 四元数归一化替代实现
-inline void arm_quaternion_normalize_f32_fallback(
-    const float32_t *input, float32_t *output, uint32_t nbQuaternions)
-{
-    for(uint32_t i = 0; i < nbQuaternions; i++) {
-        float32_t norm = sqrtf(input[4*i]*input[4*i] + input[4*i+1]*input[4*i+1] + 
-                              input[4*i+2]*input[4*i+2] + input[4*i+3]*input[4*i+3]);
-        if(norm > 0.0f) {
-            output[4*i] = input[4*i] / norm;
-            output[4*i+1] = input[4*i+1] / norm;
-            output[4*i+2] = input[4*i+2] / norm;
-            output[4*i+3] = input[4*i+3] / norm;
-        }
-    }
-}
-
-// atan2替代实现
-inline void arm_atan2_f32_fallback(float32_t y, float32_t x, float32_t *result)
-{
-    *result = atan2f(y, x);
-}
-
-#define arm_quaternion_product_single_f32 arm_quaternion_product_single_f32_fallback
-#define arm_quaternion_normalize_f32 arm_quaternion_normalize_f32_fallback
-#define arm_quaternion_inverse_f32 arm_quaternion_inverse_f32_fallback
-#define arm_atan2_f32 arm_atan2_f32_fallback
-#endif
-
 /**
  * @file quaternion_math.hpp
  * @brief 四元数数学运算库内部C++接口

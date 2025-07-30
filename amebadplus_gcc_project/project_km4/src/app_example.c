@@ -59,11 +59,11 @@ void app_example(void)
    //     printf("Failed to create timer event task\n");
    // }
  //   fan_controller_example();
-   // stepper_motor_init();
+    stepper_motor_init();
     //timer_1ms_init();
    	//fw_timer_event_CancelAllTimerEvent();
    
-    //stepper_motor_set_direction(MOTOR_BASE, Motor_Direction_Forward, 800);
+    stepper_motor_set_direction(MOTOR_BASE, Motor_Direction_Forward, 800);
    
     // 2. 初始化任务管理系统
     //task_manager_init();
