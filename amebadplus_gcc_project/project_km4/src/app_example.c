@@ -63,13 +63,13 @@ void app_example(void)
     //timer_1ms_init();
    	//fw_timer_event_CancelAllTimerEvent();
    
-    stepper_motor_set_direction(MOTOR_BASE, Motor_Direction_Forward, 800);
+    stepper_motor_set_direction(MOTOR_BASE, Motor_Direction_Forward, 820);
    
     // 2. 初始化任务管理系统
     //task_manager_init();
     
    // stepper_motor_set_direction(MOTOR_BASE, Motor_Direction_Forward, 800);
-    //DisplayLCD_Init();
+    DisplayLCD_Init();
 
 
     // 3. 启动所有应用任务
