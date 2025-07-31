@@ -299,6 +299,10 @@ static void stepper_motor_direction_handler(stepper_motor_t *motor)
 {
     if(motor->target_direction == Motor_Direction_Stop) {
         motor->state = Motor_State_Stopping;
+
+        if(motor->current_speed == 0){
+            motor->state = Motor_State_Stop;
+        }
     } else if(motor->target_direction == Motor_Direction_Forward) {
         motor->state = Motor_State_Forward;
         motor->position++;
@@ -318,6 +322,10 @@ static void stepper_motor_direction_handler(stepper_motor_t *motor)
     } else if (target_speed < motor->current_speed) {
         if(motor->accelerate_step > 0) motor->accelerate_step--;
         motor->current_speed = stepper_motor_speed_handler(motor->current_speed, target_speed, motor->accelerate_rate);
+
+        if(motor->current_speed == 0 && motor->target_direction == Motor_Direction_Stop) {
+            motor->state = Motor_State_Stop;
+        }
     }
 }
 
@@ -390,6 +398,7 @@ static uint32_t timer_neck_handler(void *id)
     return 0;
 }
 
+int i = 0;
 static uint32_t timer_base_handler(void *id)
 {
     RTIM_TimeBaseInitTypeDef *rtim_config = (RTIM_TimeBaseInitTypeDef *)id;
@@ -397,8 +406,11 @@ static uint32_t timer_base_handler(void *id)
     // 执行步进控制
     stepper_motor_driver(MOTOR_BASE);
     
+    if(i==500){
     printf("base motor timer run!\n");
-    
+    i = 0;
+}
+    i++;
     // 清除中断标志
     RTIM_INTClear(TIMx[rtim_config->TIM_Idx]);
     RTIM_INTClear(TIMx[rtim_config->TIM_Idx]); // 确保清除
