@@ -63,8 +63,11 @@ void app_example(void)
     //timer_1ms_init();
    	//fw_timer_event_CancelAllTimerEvent();
    
-    stepper_motor_set_direction(MOTOR_BASE, Motor_Direction_Forward, 820);
-   
+    stepper_motor_set_direction(MOTOR_BASE, Motor_Direction_Forward, 242);
+
+    rtos_time_delay_ms(10000);
+
+    stepper_motor_stop(MOTOR_BASE, false, false);
     // 2. 初始化任务管理系统
     //task_manager_init();
     
