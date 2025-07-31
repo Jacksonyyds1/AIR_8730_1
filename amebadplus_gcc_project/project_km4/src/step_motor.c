@@ -147,38 +147,41 @@ static void stepper_motor_update_timer_period(uint8_t index)
 {
     if(index >= MOTOR_COUNT) return;
     
-    // 修正的周期计算逻辑
-    // current_speed范围: 0-1000
-    // 映射到合理的步进频率范围: 10Hz - 2000Hz
+    // 新的周期计算逻辑
+    // current_speed范围: 100-600 (与频率值一一对应)
+    // 频率范围: 100Hz - 600Hz
     uint32_t period_us;
     
     if(stepper_motor[index].current_speed == 0) {
         // 速度为0时，使用最大周期（最低频率）
-        period_us = 100000; // 100ms = 10Hz
+        period_us = 100000; // 100ms = 10Hz (停止状态)
+    } else if(stepper_motor[index].current_speed < 100) {
+        // 如果速度小于100，设定为最低工作频率100Hz
+        period_us = (uint32_t)(1000000.0f / 100.0f); // 10000μs = 100Hz
+    } else if(stepper_motor[index].current_speed > 1000) {
+        // 如果速度大于1000，限制为最高工作频率1000Hz
+        period_us = (uint32_t)(1000000.0f / 30000.0f); // 1000μs = 1000Hz
     } else {
-        // 改进的映射算法: 
-        // speed 1-1000 映射到频率 20Hz-2000Hz
-        // 使用对数或线性映射提供更好的控制精度
-        
-        float speed_normalized = (float)stepper_motor[index].current_speed / 1000.0f; // 0.001 - 1.0
-        
-        // 线性映射到频率: 20Hz + (2000-20) * speed_ratio = 20 + 1980 * speed_ratio
-        float target_frequency = 20.0f + 1980.0f * speed_normalized;
+        // 速度值直接作为频率值使用
+        // speed = frequency (100-600)
+        float target_frequency = (float)stepper_motor[index].current_speed;
         
         // 转换为周期(微秒)
         period_us = (uint32_t)(1000000.0f / target_frequency);
-        
-        // 安全范围检查
-        if(period_us < 500) period_us = 500;     // 最大2000Hz
-        if(period_us > 50000) period_us = 50000; // 最小20Hz
     }
+    
+    // 安全范围检查（对应600Hz到100Hz）
+    if(period_us < 33) period_us = 33;     // 最大600Hz
+    if(period_us > 10000) period_us = 10000;   // 最小100Hz
     
     // 计算RTIM周期值 (32.768kHz时钟，周期 = 30.517μs)
     uint32_t rtim_period = (uint32_t)((float)period_us / 1000000.0f * 32768.0f) - 1;
     
-    // 确保RTIM周期在有效范围内 (至少15个tick，避免过快)
-    if(rtim_period < 15) rtim_period = 15;
-    if(rtim_period > 3276) rtim_period = 3276; // 对应约100ms
+    // 确保RTIM周期在有效范围内
+    // 对应600Hz: 1667μs -> 54 ticks
+    // 对应100Hz: 10000μs -> 327 ticks
+    if(rtim_period < 1) rtim_period = 1;     // 对应600Hz
+    if(rtim_period > 327) rtim_period = 327;   // 对应100Hz
     
     // 如果周期发生变化，重新配置定时器
     if(rtim_period != motor_rtim_config[index].TIM_Period) {
@@ -207,21 +210,23 @@ static void stepper_motor_start_timer(uint8_t index)
         period_us = 100000; // 100ms = 10Hz
     } else {
         // 改进的映射算法: speed 1-1000 映射到频率 20Hz-2000Hz
-        float speed_normalized = (float)stepper_motor[index].current_speed / 1000.0f;
-        float target_frequency = 20.0f + 1980.0f * speed_normalized;
+        float speed_normalized = (float)stepper_motor[index].current_speed ;
+        float target_frequency =  speed_normalized;
         period_us = (uint32_t)(1000000.0f / target_frequency);
         
-        // 安全范围检查
-        if(period_us < 500) period_us = 500;     // 最大2000Hz
-        if(period_us > 50000) period_us = 50000; // 最小20Hz
+    // 安全范围检查（对应600Hz到100Hz）
+    if(period_us < 33) period_us = 33;     // 最大600Hz
+    if(period_us > 10000) period_us = 10000;   // 最小100Hz
     }
     
     // 计算RTIM周期值 (32.768kHz时钟)
     uint32_t rtim_period = (uint32_t)((float)period_us / 1000000.0f * 32768.0f) - 1;
     
     // 确保RTIM周期在有效范围内
-    if(rtim_period < 15) rtim_period = 15;
-    if(rtim_period > 3276) rtim_period = 3276;
+    // 对应600Hz: 1667μs -> 54 ticks
+    // 对应100Hz: 10000μs -> 327 ticks
+    if(rtim_period < 1) rtim_period = 1;     // 对应600Hz
+    if(rtim_period > 327) rtim_period = 327;   // 对应100Hz
     
     // 更新配置
     motor_rtim_config[index].TIM_Period = rtim_period;
@@ -283,6 +288,9 @@ static void stepper_motor_position_handler(stepper_motor_t *motor)
     if(motor->target_position == motor->position) {
         motor->state = Motor_State_Stopping;
         motor->target_direction = Motor_Direction_Stop;
+        if(motor->current_speed == 0) {
+            motor->state = Motor_State_Stop;
+        }
     } else if(motor->target_position > motor->position) {
         motor->target_direction = Motor_Direction_Forward;
         motor->state = Motor_State_Forward;
@@ -291,6 +299,10 @@ static void stepper_motor_position_handler(stepper_motor_t *motor)
         motor->target_direction = Motor_Direction_Backward;
         motor->state = Motor_State_Backward;
         motor->position--;
+    }
+    // 处理停止状态的转换
+    if(motor->current_speed == 0 && motor->target_direction == Motor_Direction_Stop) {
+        motor->state = Motor_State_Stop;
     }
 }
 
