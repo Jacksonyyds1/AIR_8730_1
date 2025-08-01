@@ -68,8 +68,8 @@ typedef struct {
 /* static encoder_signal_filter_t signal_filters[2] = {
     {0, 0, 1, false},  // MOTOR_NECK: 1ms去抖时间
     {0, 0, 1, false}   // MOTOR_BASE: 1ms去抖时间
-}; */
-
+};
+ */
 void encoder_enable_simulated_signals(bool enable)
 {
     enable_simulated_signals = enable;
@@ -131,6 +131,7 @@ void encoder_init(void)
     encoder_config_t encoder_config;
     encoder_config.tracking_lost_threshold = 3; // 连续1次失败切换搜索模式
     encoder_config.backlash_compensation = 0;   // 默认回差补偿
+    encoder_config.enable_ring_mode = false;    // 禁用环形编码器模式
     
     base_encoder_map_handle = abs_encoder_create_map_with_pool(base_encoder_map_data, 350, 11, node_pool, 695);
     neck_encoder_map_handle = abs_encoder_create_map_with_pool(neck_encoder_map_data, 180, 9, node_pool + (695 * 20), 366);
@@ -168,6 +169,20 @@ int encoder_get_position(uint8_t index)
     else if(index == MOTOR_BASE)
     {
         return encoder_base_position.absolute_position;
+    }
+
+    return 0; // Invalid motor index
+}
+
+float encoder_get_estimate_position(uint8_t index)
+{
+    if(index == MOTOR_NECK)
+    {
+        return encoder_neck_position.estimated_position;
+    }
+    else if(index == MOTOR_BASE)
+    {
+        return encoder_base_position.estimated_position;
     }
 
     return 0; // Invalid motor index

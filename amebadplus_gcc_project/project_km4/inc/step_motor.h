@@ -100,6 +100,8 @@ void stepper_motor_timer_init(void);
 // 编码器数据获取函数
 bool stepper_motor_get_encoder_data(encoder_sampled_data_t *data, int timeout);
 
+void stepper_motor_move(uint8_t index, Motor_Direction_t target_direction, uint16_t target_pps, bool immediate);
+
 #ifdef __cplusplus
 }
 #endif

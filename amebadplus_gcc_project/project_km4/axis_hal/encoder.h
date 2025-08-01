@@ -21,6 +21,7 @@
 void encoder_init(void);
 encoder_handle_t encoder_get_handle(uint8_t motor_index);
 int encoder_get_position(uint8_t index);
+float encoder_get_estimate_position(uint8_t index);
 
 encoder_state_t encoder_get_state(uint8_t index);
 const char *encoder_get_state_string(encoder_state_t state);

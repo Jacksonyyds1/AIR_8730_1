@@ -42,9 +42,12 @@ float axis_internal_to_external_angle(axis_handle_t *handle, float internal_angl
     return internal_angle;
 }
 
-int axis_internal_angle_to_motor_steps(axis_handle_t *handle, float internal_angle)
+int axis_angle_to_motor_steps(axis_handle_t *handle, float angle)
 {
     if(!handle) return 0;
+
+    // 将外部角度转换为内部角度
+    float internal_angle = axis_external_to_internal_angle(handle, angle);
     
     // 将角度转换为编码器单位
     float encoder_units = internal_angle / handle->config.angle_per_encoder_unit;
@@ -61,7 +64,10 @@ float axis_motor_steps_to_angle(axis_handle_t *handle, int motor_steps)
     float encoder_units = (float)motor_steps / handle->config.motor_steps_per_unit;
     
     // 再转换为内部角度
-    return encoder_units * handle->config.angle_per_encoder_unit;
+    float internal_angle = encoder_units * handle->config.angle_per_encoder_unit;
+
+    // 返回外部角度
+    return axis_internal_to_external_angle(handle, internal_angle);
 }
 
 uint16_t axis_angle_velocity_to_motor_pps(axis_handle_t *handle, float deg_per_sec)
@@ -77,28 +83,4 @@ uint16_t axis_angle_velocity_to_motor_pps(axis_handle_t *handle, float deg_per_s
     if(motor_pps > 60000) return 60000; // 最大频率限制
     
     return (uint16_t)motor_pps;
-}
-
-bool axis_is_angle_in_limits(axis_handle_t *handle, float angle)
-{
-    if(!handle) return false;
-    
-    if(!handle->config.enable_limits) return true;
-    
-    // 将外部限位转换为内部限位进行比较
-    float min_limit, max_limit;
-    
-    // 确保min < max
-    if(handle->config.min_limit > handle->config.max_limit)
-    {
-        min_limit = handle->config.max_limit;
-        max_limit = handle->config.min_limit;
-    }
-    else
-    {
-        min_limit = handle->config.min_limit;
-        max_limit = handle->config.max_limit;
-    }
-
-    return (angle >= min_limit && angle <= max_limit);
 }

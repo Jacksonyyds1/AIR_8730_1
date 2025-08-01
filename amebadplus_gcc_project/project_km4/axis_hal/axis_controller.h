@@ -73,11 +73,13 @@ typedef struct
     axis_state_t state;
     axis_position_t position;
     axis_motion_params_t motion_params;
+    encoder_state_t encoder_state;      // 编码器状态
+    encoder_state_t last_encoder_state; // 上一个编码器状态
     
     // 控制相关
     float target_velocity;           // 运动速度
     int target_motor_position;       // 目标电机位置（步数）
-    bool positioning_active;         // 定位是否激活
+    bool positioning_active;         // 前往目标位置中
     
     // 初始化相关
     int init_move_direction;
@@ -86,6 +88,24 @@ typedef struct
     uint32_t last_update_time;
     uint32_t error_count;
 } axis_handle_t;
+
+// === 辅助函数声明 ===
+
+/**
+ * @brief 将角速度转换为电机脉冲速度
+ * @param handle 轴控制器句柄
+ * @param deg_per_sec 角速度(度/秒)
+ * @return 电机脉冲速度(每秒脉冲数)
+ */
+uint16_t convert_speed_to_pps(axis_handle_t *handle, float deg_per_sec);
+
+/**
+ * @brief 将电机脉冲速度转换为角速度
+ * @param handle 轴控制器句柄
+ * @param pps 电机脉冲速度
+ * @return 角速度(度/秒)
+ */
+float convert_pps_to_speed(axis_handle_t *handle, uint16_t pps);
 
 // === 创建和销毁接口 ===
 
@@ -243,7 +263,7 @@ int axis_is_angle_speed_in_range(axis_handle_t *handle, float speed);
  * @param angle 外部角度(度)
  * @return 是否在限位范围内
  */
-bool axis_is_external_angle_in_limits(axis_handle_t *handle, float angle);
+bool axis_is_angle_in_limits(axis_handle_t *handle, float angle);
 
 // === 参数配置接口 ===
 
@@ -254,16 +274,6 @@ bool axis_is_external_angle_in_limits(axis_handle_t *handle, float angle);
  * @return 是否成功
  */
 bool axis_set_motion_params(axis_handle_t *handle, const axis_motion_params_t *params);
-
-/**
- * @brief 设置角度限位
- * @param handle 轴控制器句柄
- * @param min_limit 最小角度限位
- * @param max_limit 最大角度限位
- * @param enable 是否启用限位
- * @return 是否成功
- */
-bool axis_set_angle_limits(axis_handle_t *handle, float min_limit, float max_limit, bool enable);
 
 // === 状态处理接口 ===
 

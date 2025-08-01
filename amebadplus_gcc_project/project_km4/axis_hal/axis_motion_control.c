@@ -1,6 +1,8 @@
 #include <math.h>
 #include <stdlib.h>
 
+#include "logger/logger.h"
+
 #include "axis_motion_control.h"
 #include "axis_coordinate_transform.h"
 #include "step_motor.h"
@@ -43,9 +45,8 @@ bool axis_start_motor_movement(axis_handle_t *handle, int target_motor_position,
     }
     
     // 设置电机速度和方向
-    stepper_motor_set_speed(handle->config.motor_index, speed, false);
     stepper_motor_set_acceleration_rate(handle->config.motor_index, handle->motion_params.acceleration_rate);
-    stepper_motor_set_direction(handle->config.motor_index, direction, speed);
+    stepper_motor_move(handle->config.motor_index, direction, speed, false);
     
     return true;
 }
@@ -79,8 +80,7 @@ bool axis_start_motor_velocity(axis_handle_t *handle, float velocity, bool immed
     }
     
     uint16_t motor_pps = axis_angle_velocity_to_motor_pps(handle, velocity);
-    stepper_motor_set_speed(handle->config.motor_index, motor_pps, immediate);
-    stepper_motor_set_direction(handle->config.motor_index, direction, motor_pps);
+    stepper_motor_move(handle->config.motor_index, direction, motor_pps, immediate);
     
     return true;
 }
@@ -131,14 +131,14 @@ void axis_update_position_from_encoder(axis_handle_t *handle)
 {
     if(!handle) return;
     
-    encoder_state_t encoder_state = encoder_get_state(handle->config.motor_index);
-    
-    if(encoder_state == ENCODER_STATE_TRACKING)
+    handle->encoder_state = encoder_get_state(handle->config.motor_index);
+
+    if(handle->encoder_state == ENCODER_STATE_TRACKING)
     {
-        int encoder_position = encoder_get_position(handle->config.motor_index);
+        float encoder_position = encoder_get_estimate_position(handle->config.motor_index);
         
         // 将编码器位置转换为角度
-        float internal_angle = (float)encoder_position * handle->config.angle_per_encoder_unit;
+        float internal_angle = encoder_position * handle->config.angle_per_encoder_unit;
         
         // 更新当前角度
         handle->position.current_angle = axis_internal_to_external_angle(handle, internal_angle);
@@ -146,5 +146,23 @@ void axis_update_position_from_encoder(axis_handle_t *handle)
         // 计算位置误差
         float error = handle->position.target_angle - handle->position.current_angle;
         handle->position.position_error = error;
+
+        if(handle->last_encoder_state != ENCODER_STATE_TRACKING)
+        {
+            // 进入跟踪状态
+            LOGI("Motor %d encoder tracking started, axis angle %.1f",
+                 handle->config.motor_index, handle->position.current_angle);
+        }
     }
+    else
+    {
+        if(handle->last_encoder_state == ENCODER_STATE_TRACKING)
+        {
+            // 退出跟踪状态
+            LOGI("Motor %d encoder tracking stopped, axis angle %.1f",
+                 handle->config.motor_index, handle->position.current_angle);
+        }
+    }
+
+    handle->last_encoder_state = handle->encoder_state;
 }

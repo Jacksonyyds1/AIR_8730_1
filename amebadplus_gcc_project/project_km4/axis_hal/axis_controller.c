@@ -10,20 +10,22 @@
 #include "axis_motion_control.h"
 #include "axis_controller.h"
 #include "encoder.h"
+#include "IO_driver.h"
+
 
 // 内部常量定义
 #define AXIS_ANGLE_TOLERANCE_DEFAULT    0.5f    // 默认位置容差(度)
 #define AXIS_POSITION_UPDATE_THRESHOLD  0.1f    // 位置更新阈值(度)
 #define AXIS_POSITIONING_SPEED          5.0f    // 默认定位速度(度/秒)
 
-// === 内部辅助函数实现 ===
+// === 辅助函数实现 ===
 
-static uint16_t convert_speed_to_pps(axis_handle_t *handle, float deg_per_sec)
+uint16_t convert_speed_to_pps(axis_handle_t *handle, float deg_per_sec)
 {
-    return (uint16_t)(deg_per_sec / handle->config.angle_per_encoder_unit * handle->config.motor_steps_per_unit);
+    return (uint16_t)(fabsf(deg_per_sec) / handle->config.angle_per_encoder_unit * handle->config.motor_steps_per_unit);
 }
 
-static float convert_pps_to_speed(axis_handle_t *handle, uint16_t pps)
+float convert_pps_to_speed(axis_handle_t *handle, uint16_t pps)
 {
     return (float)pps * handle->config.angle_per_encoder_unit / handle->config.motor_steps_per_unit;
 }
@@ -111,6 +113,11 @@ axis_handle_t *axis_create(const axis_config_t *config)
     handle->motion_params.acceleration_rate = config->motion.acceleration_rate;
     
     // 初始化位置信息
+    if(config->max_limit < config->min_limit)
+    {
+        LOGE("Invalid angle limits: max_limit < min_limit");
+    }
+
     handle->position.min_angle_limit = config->min_limit;
     handle->position.max_angle_limit = config->max_limit;
     handle->position.limits_enabled = config->enable_limits;
@@ -237,7 +244,7 @@ bool axis_is_in_position(axis_handle_t *handle, float target_angle, float tolera
         return false;
     }
     
-    float error = fabsf(handle->position.target_angle - target_angle);
+    float error = fabsf(handle->position.current_angle - target_angle);
     return error <= tolerance;
 }
 
@@ -292,7 +299,7 @@ int axis_is_angle_speed_in_range(axis_handle_t *handle, float speed)
     return speed <= handle->motion_params.max_velocity ? 1 : 0;
 }
 
-bool axis_is_external_angle_in_limits(axis_handle_t *handle, float angle)
+bool axis_is_angle_in_limits(axis_handle_t *handle, float angle)
 {
     if(!handle || !handle->position.limits_enabled)
     {
@@ -373,6 +380,37 @@ const char *axis_get_result_string(axis_result_t result)
 
 // === 运动控制接口实现 ===
 
+static void axis_encoder_power_set(axis_handle_t *handle, bool enable)
+{
+    if(!handle)
+    {
+        return;
+    }
+
+    if(enable)
+    {
+        if(handle->config.motor_index == MOTOR_NECK)
+        {
+            encoder_neck_power_on();
+        }
+        else if(handle->config.motor_index == MOTOR_BASE)
+        {
+            encoder_base_power_on();
+        }
+    }
+    else
+    {
+        if(handle->config.motor_index == MOTOR_NECK)
+        {
+            encoder_neck_power_off();
+        }
+        else if(handle->config.motor_index == MOTOR_BASE)
+        {
+            encoder_base_power_off();
+        }
+    }
+} 
+
 axis_result_t axis_move_to_angle(axis_handle_t *handle, float target_angle, float speed)
 {
     if(!handle)
@@ -391,9 +429,10 @@ axis_result_t axis_move_to_angle(axis_handle_t *handle, float target_angle, floa
         return AXIS_RESULT_OUT_OF_RANGE;
     }
 
+    axis_encoder_power_set(handle, true);
+
     // 计算目标电机位置
-    float internal_angle = axis_external_to_internal_angle(handle, target_angle);
-    int target_motor_steps = axis_internal_angle_to_motor_steps(handle, internal_angle);
+    int target_motor_steps = axis_angle_to_motor_steps(handle, target_angle);
 
     // 设置目标角度
     handle->position.target_angle = target_angle;
@@ -466,6 +505,7 @@ axis_result_t axis_move_velocity(axis_handle_t *handle, float velocity_deg_per_s
         else
         {
             handle->state = AXIS_STATE_MOVING;
+            axis_encoder_power_set(handle, true);
         }
         return AXIS_RESULT_SUCCESS;
     }
@@ -499,11 +539,13 @@ bool axis_stop(axis_handle_t *handle, bool emergency_stop)
 
 static void process_init_positioning(axis_handle_t *handle)
 {
+    axis_encoder_power_set(handle, true);
+
     if(stepper_motor_get_state(handle->config.motor_index) == Motor_State_Stop)
     {
-        Motor_Direction_t direction = handle->init_move_direction > 0 ? Motor_Direction_Forward : Motor_Direction_Backward;
+        motor_direction_t direction = handle->init_move_direction > 0 ? Motor_Direction_Forward : Motor_Direction_Backward;
         uint16_t target_pps = convert_speed_to_pps(handle, AXIS_POSITIONING_SPEED);
-        stepper_motor_set_direction(handle->config.motor_index, direction, target_pps);
+        stepper_motor_move(handle->config.motor_index, direction, target_pps, false);
     }
     
     encoder_state_t encoder_state = encoder_get_state(handle->config.motor_index);
@@ -538,14 +580,28 @@ static void process_init_return(axis_handle_t *handle)
     }
 }
 
-/* static void process_moving(axis_handle_t *handle)
+static void process_idle(axis_handle_t *handle)
+{
+    if(!handle)
+    {
+        return;
+    }
+
+    // 如果电机已经停止，关闭编码器供电
+    if(stepper_motor_get_state(handle->config.motor_index) == Motor_State_Stop)
+    {
+        axis_encoder_power_set(handle, false);
+    }
+}
+
+static void process_moving(axis_handle_t *handle)
 {
     if(!handle)
     {
         return;
     }
     
-    Motor_State_t motor_state = stepper_motor_get_state(handle->config.motor_index);
+    motor_state_t motor_state = stepper_motor_get_state(handle->config.motor_index);
 
     if(motor_state == Motor_State_Stop)
     {
@@ -556,7 +612,7 @@ static void process_init_return(axis_handle_t *handle)
     }
 
     axis_process_motion_control(handle);
-} */
+}
 
 void axis_update(axis_handle_t *handle)
 {
@@ -564,6 +620,8 @@ void axis_update(axis_handle_t *handle)
     {
         return;
     }
+
+    axis_update_position_from_encoder(handle);
 
     // 处理状态机
     switch(handle->state)
@@ -582,6 +640,7 @@ void axis_update(axis_handle_t *handle)
         break;
 
     case AXIS_STATE_IDLE:
+        process_idle(handle);
         break;
         
     case AXIS_STATE_MOVING:

@@ -752,3 +752,14 @@ bool stepper_motor_get_encoder_data(encoder_sampled_data_t *data, int timeout)
     BaseType_t result = xQueueReceive(encoder_sample_queue, data, timeout);
     return (result == pdTRUE);
 }
+
+/*********************************************************************** */
+void stepper_motor_move(uint8_t index, Motor_Direction_t target_direction, uint16_t target_pps, bool immediate)
+{
+    UNUSED(index);
+    UNUSED(target_direction);
+    UNUSED(target_pps);
+    UNUSED(immediate);
+
+    return;
+}
