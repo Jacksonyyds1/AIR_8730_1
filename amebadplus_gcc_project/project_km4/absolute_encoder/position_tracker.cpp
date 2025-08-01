@@ -8,10 +8,14 @@ namespace AbsoluteEncoder
 
 PositionTracker::PositionTracker(EncoderMap &encoder_map, const uint8_t *pattern, uint16_t pattern_length, bool ring_mode)
     : encoder_map_(encoder_map),
-        pattern_(pattern), pattern_length_(pattern_length),
-        state_(TrackerState::UNINITIALIZED), current_position_(0),
-        current_direction_(SearchDirection::FORWARD), consecutive_failures_(0),
-        ring_mode_(ring_mode)
+        pattern_(pattern), 
+        pattern_length_(pattern_length),
+        ring_mode_(ring_mode),
+        state_(TrackerState::UNINITIALIZED), 
+        current_position_(0),
+        current_direction_(SearchDirection::FORWARD), 
+        consecutive_failures_(0)
+        
 {
     clear_stats();
 
@@ -96,6 +100,7 @@ TrackerEvent PositionTracker::determine_event(uint8_t expected_bit, uint8_t actu
 
 ValidationResult PositionTracker::handle_tracking_event(TrackerEvent event, uint8_t bit, SearchDirection direction, uint16_t &position)
 {
+    (void)bit;
     switch(event)
     {
     case TrackerEvent::MATCH:
@@ -124,6 +129,9 @@ ValidationResult PositionTracker::handle_tracking_event(TrackerEvent event, uint
 
 ValidationResult PositionTracker::handle_lost_event(TrackerEvent event, uint8_t bit, SearchDirection direction, uint16_t &position)
 {
+    (void)event;
+    (void)bit;
+    (void)direction;
     // 在丢失状态时，只能等待外部重新初始化
     position = current_position_;
     return ValidationResult::INVALID;

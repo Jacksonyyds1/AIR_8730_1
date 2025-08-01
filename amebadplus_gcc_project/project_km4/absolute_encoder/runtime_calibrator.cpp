@@ -15,10 +15,11 @@ namespace AbsoluteEncoder
 RuntimeCalibrator::RuntimeCalibrator(const CalibrationConfig &config)
     : config_(config),
       current_state_(CalibrationState::UNCALIBRATED),
-      last_analysis_sample_count_(0),
       current_step_count_(0),
       last_sensor_signal_(0),
-      signal_initialized_(false)
+      signal_initialized_(false),
+      last_analysis_sample_count_(0)
+
 {
     // 初始化默认校准结果
     last_result_.state = CalibrationState::UNCALIBRATED;
@@ -111,8 +112,8 @@ bool RuntimeCalibrator::perform_calibration_analysis()
     
     // 计算置信度
     new_result.confidence_level = calculate_confidence_level(step_variance, step_samples_.size());
-    LOGI("Calibration result in %d samples: steps_per_unit=%.2f, variance=%.2f, confidence=%.2f",
-        new_result.sample_count, new_result.calibrated_steps_per_unit, step_variance, new_result.confidence_level);
+    LOGI("Calibration result in %u samples: steps_per_unit=%.2f, variance=%.2f, confidence=%.2f",
+        (unsigned int)new_result.sample_count, new_result.calibrated_steps_per_unit, step_variance, new_result.confidence_level);
 
     // 验证结果
     if(validate_calibration_result(new_result))
@@ -243,7 +244,7 @@ void RuntimeCalibrator::detect_signal_transition(uint8_t new_signal)
                 int devider = std::round(current_step_count_ / reference_steps);
                 float steps_per_unit = current_step_count_ / (float)devider;
                 
-                for(uint32_t i = 0; i < devider; i++)
+                for(uint32_t i = 0; i < (uint32_t)devider; i++)
                 {
                     add_step_sample(steps_per_unit);
                 }
