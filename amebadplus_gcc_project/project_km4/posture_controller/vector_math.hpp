@@ -31,6 +31,16 @@ Vector3(float32_t x = 0.0f, float32_t y = 0.0f, float32_t z = 0.0f) : x(x), y(y)
 Vector3(float32_t* arr) : x(arr[0]), y(arr[1]), z(arr[2]) {}
 Vector3(const Vector3& other) : x(other.x), y(other.y), z(other.z) {}
 
+// 添加赋值操作符 (修复 deprecated copy 警告)
+    Vector3& operator=(const Vector3& other) {
+        if (this != &other) {
+            x = other.x;
+            y = other.y;
+            z = other.z;
+        }
+        return *this;
+    }
+
 // 基础运算操作符
 Vector3 operator+(const Vector3& other) const {
     Vector3 result;

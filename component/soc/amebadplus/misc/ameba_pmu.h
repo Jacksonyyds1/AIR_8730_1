@@ -60,9 +60,11 @@ void pmu_unregister_sleep_callback(uint32_t nDeviceId);
 
 int pmu_ready_to_sleep(void);
 int pmu_check_wakelock_timeout(void);
-int pmu_ready_to_dsleep(void);
+
 void pmu_pre_sleep_processing(uint32_t *expected_idle_time);
 void pmu_post_sleep_processing(uint32_t *expected_idle_time);
+int pmu_ready_to_sleep(void);
+
 
 void pmu_acquire_wakelock(uint32_t nDeviceId);
 void pmu_release_wakelock(uint32_t nDeviceId);

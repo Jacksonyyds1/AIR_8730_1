@@ -1,3 +1,4 @@
+
 // RTL8721DCM系统头文件
 #include "ameba_soc.h"
 #include "peripheral_wrapper.h"
@@ -25,6 +26,7 @@
 
 #define sys_tick() xTaskGetTickCount()
 
+
 PostureController::HingeJoint &axis_system = PostureController::HingeJoint::getInstance();
 static axis_handle_t *base_axis, *neck_axis;
 
@@ -48,9 +50,16 @@ typedef struct {
 
 posture_runtime_t posture_runtime = {
     .state = Posture_Controller_State_Uninitialized,
+    .base_oscillation_state=Oscillation_State_Wait,
+    .base_oscillation_reverse_tick=0, 
     .base_oscillation_range_deg = 0.0f,
+    .neck_oscillation_state=Oscillation_State_Wait,
+    .neck_oscillation_reverse_tick=0,
+    .neck_oscillation_range_deg=0.0f,
     .base_angle_target_deg = 0.0f,
-    .nozzle_elevation_target_deg = 0.0f
+    .nozzle_elevation_target_deg = 0.0f,
+    .base_angle_initial_deg=0.0f,
+    .neck_angle_rotation_deg=0.0f
 };
 
 /**
@@ -334,11 +343,19 @@ static void neck_oscillation_state_process(void)
 
 static void elevation_control_state_process(void)
 {
+
     const SphericalCoord current_coord = axis_system.get_nozzle_spherical_coord();
     SphericalCoord target_coord(current_coord.azimuth, posture_runtime.nozzle_elevation_target_deg);
     Vector3 current_vector, target_vector;
     current_vector = current_coord.toVector();
     target_vector = target_coord.toVector();
+
+        // 显式创建临时变量，避免 deprecated copy 警告
+/*     GraphicsMath::Vector3 temp_current = current_coord.toVector();
+    current_vector = temp_current;
+    
+    GraphicsMath::Vector3 temp_target = target_coord.toVector();
+    target_vector = temp_target; */
     
     Quaternion rotate_axis = Quaternion::fromVectors(current_vector, target_vector);
     
@@ -357,12 +374,12 @@ static void elevation_control_state_process(void)
     }
 
     // 获取当前角度
-    float current_base_deg = axis_system.get_base_angle_deg();
+    //float current_base_deg = axis_system.get_base_angle_deg();
     float current_neck_deg = axis_system.get_neck_angle_deg();
     
     // 确定neck轴旋转方向和速度
     float neck_deg_error = posture_runtime.neck_angle_rotation_deg - current_neck_deg;
-    bool neck_counterclockwise = (posture_runtime.nozzle_elevation_target_deg > current_coord.elevation); // 目标仰角高于当前：逆时针
+    //bool neck_counterclockwise = (posture_runtime.nozzle_elevation_target_deg > current_coord.elevation); // 目标仰角高于当前：逆时针
 
     // neck轴使用位置控制，以最大速度移动
     bool neck_success = false;
@@ -459,6 +476,7 @@ void posture_controller_state_process(void)
  */
 void axis_system_task(void *pvParameters)
 {
+    (void)pvParameters;
     TickType_t xLastWakeTime;
     xLastWakeTime = xTaskGetTickCount(); // Initialize the last wake time
 
@@ -511,7 +529,7 @@ bool posture_controller_move_base(float angle_deg)
         return false;
     }
 
-    if(!axis_is_external_angle_in_limits(base_axis, angle_deg))
+    if(!axis_is_angle_in_limits(base_axis, angle_deg))
     {
         LOGE("Target angle %.2f degrees out of range [%f, %f]", angle_deg,
              base_axis->config.min_limit, base_axis->config.max_limit);

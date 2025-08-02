@@ -5,6 +5,7 @@
 #include <algorithm>
 
 #include "arm_math.h"
+#include "quaternion_functions.h"
 
 #include "rad_deg.hpp"
 #include "spherical_math.hpp"

@@ -4,7 +4,10 @@
 #include <cmath>
 #include <algorithm>
 
+// 包含ARM CMSIS库头文件
 #include "arm_math.h"
+#include "quaternion_functions.h"
+#include "arm_common_tables.h"
 
 #include "rad_deg.hpp"
 #include "vector_math.hpp"
@@ -34,6 +37,17 @@ Quaternion(float32_t *arr)
     : w(arr[0]), x(arr[1]), y(arr[2]), z(arr[3]) {}
 Quaternion(const Quaternion& other) 
     : w(other.w), x(other.x), y(other.y), z(other.z) {}
+
+    //添加赋值操作符 (修复 deprecated copy 警告)
+    Quaternion& operator=(const Quaternion& other) {
+        if (this != &other) {
+            w = other.w;
+            x = other.x;
+            y = other.y;
+            z = other.z;
+        }
+        return *this;
+    }
 
 // 基础运算操作符
 Quaternion operator+(const Quaternion& other) const {

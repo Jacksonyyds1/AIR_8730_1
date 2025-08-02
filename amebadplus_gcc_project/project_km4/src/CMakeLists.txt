@@ -65,7 +65,6 @@ ameba_list_append(private_sources
          Fan_motor.c
          task_manager.c
          lvg_lcd_adapter.c
-         peripheral_wrapper.c
          )
 
 # Component private part, user config end
