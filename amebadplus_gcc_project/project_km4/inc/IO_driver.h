@@ -7,10 +7,13 @@
 extern "C" {
 #endif
 
+void test_1();
+void test_2();
+void test_3();
 
-#define encoder_neck_power_on()  1
-#define encoder_neck_power_off() 0
-#define encoder_neck_read()      3
+#define encoder_neck_power_on()  test_1();
+#define encoder_neck_power_off() test_2();
+#define encoder_neck_read()      test_3();
 
 
 
