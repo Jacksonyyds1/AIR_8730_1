@@ -287,16 +287,7 @@ bool equals(const Quaternion& other, float32_t tolerance = 1e-6f) const {
             std::abs(y - other.y) < tolerance &&
             std::abs(z - other.z) < tolerance;
 }
-  // 添加赋值操作符
-    Quaternion& operator=(const Quaternion& other) {
-        if (this != &other) {
-            w = other.w;
-            x = other.x;
-            y = other.y;
-            z = other.z;
-        }
-        return *this;
-    }
+
 };
 
 // 全局操作符

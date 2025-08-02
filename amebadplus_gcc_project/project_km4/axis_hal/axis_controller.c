@@ -543,7 +543,7 @@ static void process_init_positioning(axis_handle_t *handle)
 
     if(stepper_motor_get_state(handle->config.motor_index) == Motor_State_Stop)
     {
-        motor_direction_t direction = handle->init_move_direction > 0 ? Motor_Direction_Forward : Motor_Direction_Backward;
+        Motor_Direction_t direction = handle->init_move_direction > 0 ? Motor_Direction_Forward : Motor_Direction_Backward;
         uint16_t target_pps = convert_speed_to_pps(handle, AXIS_POSITIONING_SPEED);
         stepper_motor_move(handle->config.motor_index, direction, target_pps, false);
     }
@@ -594,14 +594,14 @@ static void process_idle(axis_handle_t *handle)
     }
 }
 
-static void process_moving(axis_handle_t *handle)
+/* static void process_moving(axis_handle_t *handle)
 {
     if(!handle)
     {
         return;
     }
     
-    motor_state_t motor_state = stepper_motor_get_state(handle->config.motor_index);
+    Motor_State_t motor_state = stepper_motor_get_state(handle->config.motor_index);
 
     if(motor_state == Motor_State_Stop)
     {
@@ -612,7 +612,7 @@ static void process_moving(axis_handle_t *handle)
     }
 
     axis_process_motion_control(handle);
-}
+} */
 
 void axis_update(axis_handle_t *handle)
 {

@@ -199,14 +199,6 @@ Vector3 projectOnto(const Vector3& other) const {
 Vector3 rejectFrom(const Vector3& other) const {
     return *this - projectOnto(other);
 }
-Vector3& operator=(const Vector3& other) {
-        if (this != &other) {
-            x = other.x;
-            y = other.y;
-            z = other.z;
-        }
-        return *this;
-    }
 };
 
 // 全局操作符

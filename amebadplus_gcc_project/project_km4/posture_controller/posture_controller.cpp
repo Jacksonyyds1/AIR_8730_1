@@ -51,7 +51,6 @@ posture_runtime_t posture_runtime = {
     .base_oscillation_range_deg = 0.0f,
     .base_angle_target_deg = 0.0f,
     .nozzle_elevation_target_deg = 0.0f
-
 };
 
 /**
@@ -358,12 +357,12 @@ static void elevation_control_state_process(void)
     }
 
     // 获取当前角度
-    //float current_base_deg = axis_system.get_base_angle_deg();
+    float current_base_deg = axis_system.get_base_angle_deg();
     float current_neck_deg = axis_system.get_neck_angle_deg();
     
     // 确定neck轴旋转方向和速度
     float neck_deg_error = posture_runtime.neck_angle_rotation_deg - current_neck_deg;
-   // bool neck_counterclockwise = (posture_runtime.nozzle_elevation_target_deg > current_coord.elevation); // 目标仰角高于当前：逆时针
+    bool neck_counterclockwise = (posture_runtime.nozzle_elevation_target_deg > current_coord.elevation); // 目标仰角高于当前：逆时针
 
     // neck轴使用位置控制，以最大速度移动
     bool neck_success = false;
@@ -460,7 +459,6 @@ void posture_controller_state_process(void)
  */
 void axis_system_task(void *pvParameters)
 {
-    UNUSED(pvParameters);
     TickType_t xLastWakeTime;
     xLastWakeTime = xTaskGetTickCount(); // Initialize the last wake time
 

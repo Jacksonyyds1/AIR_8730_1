@@ -19,8 +19,8 @@ typedef struct {
     int position;
     int target_position;
 
-    uint16_t current_speed;
-    uint16_t target_speed;
+    uint16_t current_pps;
+    uint16_t target_pps;
 } stepper_motor_t;
 
 static QueueHandle_t encoder_sample_queue = NULL;
@@ -66,7 +66,7 @@ static void set_stepper_motor_output(uint8_t index, int position, bool motor_bre
 static void stepper_motor_position_handler(stepper_motor_t *motor);
 static void stepper_motor_direction_handler(stepper_motor_t *motor);
 static void stepper_motor_driver(uint8_t index);
-static uint16_t stepper_motor_speed_handler(uint16_t current_speed, uint16_t target_speed, uint8_t accelerate_rate);
+static uint16_t stepper_motor_speed_handler(uint16_t current_pps, uint16_t target_pps, uint8_t accelerate_rate);
 static void stepper_motor_update_timer_period(uint8_t index);
 
 // 定时器回调函数
@@ -148,23 +148,23 @@ static void stepper_motor_update_timer_period(uint8_t index)
     if(index >= MOTOR_COUNT) return;
     
     // 新的周期计算逻辑
-    // current_speed范围: 100-600 (与频率值一一对应)
+    // current_pps范围: 100-600 (与频率值一一对应)
     // 频率范围: 100Hz - 600Hz
     uint32_t period_us;
     
-    if(stepper_motor[index].current_speed == 0) {
+    if(stepper_motor[index].current_pps == 0) {
         // 速度为0时，使用最大周期（最低频率）
         period_us = 100000; // 100ms = 10Hz (停止状态)
-    } else if(stepper_motor[index].current_speed < 100) {
+    } else if(stepper_motor[index].current_pps < 100) {
         // 如果速度小于100，设定为最低工作频率100Hz
         period_us = (uint32_t)(1000000.0f / 100.0f); // 10000μs = 100Hz
-    } else if(stepper_motor[index].current_speed > 1000) {
+    } else if(stepper_motor[index].current_pps > 1000) {
         // 如果速度大于1000，限制为最高工作频率1000Hz
         period_us = (uint32_t)(1000000.0f / 30000.0f); // 1000μs = 1000Hz
     } else {
         // 速度值直接作为频率值使用
         // speed = frequency (100-600)
-        uint32_t target_frequency = stepper_motor[index].current_speed;
+        uint32_t target_frequency = stepper_motor[index].current_pps;
         
         // 转换为周期(微秒)
         period_us = (uint32_t)(1000000.0f / target_frequency);
@@ -192,7 +192,7 @@ static void stepper_motor_update_timer_period(uint8_t index)
         
         // 重新启动定时器（如果电机未停止）
         if(stepper_motor[index].state != Motor_State_Stop || 
-           stepper_motor[index].current_speed > 0) {
+           stepper_motor[index].current_pps > 0) {
             stepper_motor_start_timer(index);
         }
     }
@@ -206,11 +206,11 @@ static void stepper_motor_start_timer(uint8_t index)
     // 使用与update函数相同的周期计算逻辑
     uint32_t period_us;
     
-    if(stepper_motor[index].current_speed == 0) {
+    if(stepper_motor[index].current_pps == 0) {
         period_us = 100000; // 100ms = 10Hz
     } else {
         // 改进的映射算法: speed 1-1000 映射到频率 20Hz-2000Hz
-        float speed_normalized = (float)stepper_motor[index].current_speed ;
+        float speed_normalized = (float)stepper_motor[index].current_pps ;
         float target_frequency =  speed_normalized;
         period_us = (uint32_t)(1000000.0f / target_frequency);
         
@@ -285,7 +285,7 @@ static void set_stepper_motor_output(uint8_t index, int position, bool motor_bre
 // --- 位置控制处理 ---
 static void stepper_motor_position_handler(stepper_motor_t *motor)
 {
-    uint16_t target_speed = 0;
+    uint16_t target_pps = 0;
     switch(motor->state)
     {
     case Motor_State_Stop:
@@ -293,7 +293,7 @@ static void stepper_motor_position_handler(stepper_motor_t *motor)
         {
             motor->state = Motor_State_Starting;
             motor->accelerate_step = 0;
-            motor->current_speed = 0;
+            motor->current_pps = 0;
         }
         break;
 
@@ -311,7 +311,7 @@ static void stepper_motor_position_handler(stepper_motor_t *motor)
             motor->current_direction = Motor_Direction_Backward;
         }
 
-        target_speed = motor->target_speed;
+        target_pps = motor->target_pps;
         break;
 
     case Motor_State_Forward:
@@ -324,7 +324,7 @@ static void stepper_motor_position_handler(stepper_motor_t *motor)
             }
             else
             {
-                target_speed = motor->target_speed;
+                target_pps = motor->target_pps;
             }
         }
         else
@@ -343,7 +343,7 @@ static void stepper_motor_position_handler(stepper_motor_t *motor)
             }
             else
             {
-                target_speed = motor->target_speed;
+                target_pps = motor->target_pps;
             }
         }
         else
@@ -367,7 +367,7 @@ static void stepper_motor_position_handler(stepper_motor_t *motor)
         else
         {
             motor->state = Motor_State_Stop;
-            motor->current_speed = 0;
+            motor->current_pps = 0;
             motor->accelerate_step = 0;
         }
         break;
@@ -376,22 +376,22 @@ static void stepper_motor_position_handler(stepper_motor_t *motor)
         break;
     }
 
-    if (target_speed > motor->current_speed)        // Accelerate
+    if (target_pps > motor->current_pps)        // Accelerate
     {
         motor->accelerate_step++;
-        motor->current_speed = stepper_motor_speed_handler(motor->current_speed, target_speed, motor->accelerate_rate);
+        motor->current_pps = stepper_motor_speed_handler(motor->current_pps, target_pps, motor->accelerate_rate);
     }
-    else if (target_speed < motor->current_speed)   // Decelerate
+    else if (target_pps < motor->current_pps)   // Decelerate
     {
         motor->accelerate_step--;
-        motor->current_speed = stepper_motor_speed_handler(motor->current_speed, target_speed, motor->accelerate_rate);
+        motor->current_pps = stepper_motor_speed_handler(motor->current_pps, target_pps, motor->accelerate_rate);
     }
 }
 
 // --- 方向控制处理 ---
 static void stepper_motor_direction_handler(stepper_motor_t *motor)
 {
-    uint16_t target_speed = 0;
+    uint16_t target_pps = 0;
     switch(motor->target_direction)
     {
     case Motor_Direction_Stop:
@@ -412,7 +412,7 @@ static void stepper_motor_direction_handler(stepper_motor_t *motor)
         {
             motor->state = Motor_State_Stop;
             motor->current_direction = Motor_Direction_Stop;
-            motor->current_speed = 0;
+            motor->current_pps = 0;
             motor->accelerate_step = 0;
         }
         break;
@@ -436,7 +436,7 @@ static void stepper_motor_direction_handler(stepper_motor_t *motor)
             motor->position++;
             motor->state = Motor_State_Forward;
             motor->current_direction = Motor_Direction_Forward;
-            target_speed = motor->target_speed;
+            target_pps = motor->target_pps;
         }
         break;
     
@@ -459,56 +459,56 @@ static void stepper_motor_direction_handler(stepper_motor_t *motor)
             motor->position--;
             motor->state = Motor_State_Backward;
             motor->current_direction = Motor_Direction_Backward;
-            target_speed = motor->target_speed;
+            target_pps = motor->target_pps;
         }
         break;
     }
 
-    if (target_speed > motor->current_speed)        // Accelerate
+    if (target_pps > motor->current_pps)        // Accelerate
     {
         motor->accelerate_step++;
-        motor->current_speed = stepper_motor_speed_handler(motor->current_speed, target_speed, motor->accelerate_rate);
+        motor->current_pps = stepper_motor_speed_handler(motor->current_pps, target_pps, motor->accelerate_rate);
     }
-    else if (target_speed < motor->current_speed)   // Decelerate
+    else if (target_pps < motor->current_pps)   // Decelerate
     {
         motor->accelerate_step--;
-        motor->current_speed = stepper_motor_speed_handler(motor->current_speed, target_speed, motor->accelerate_rate);
+        motor->current_pps = stepper_motor_speed_handler(motor->current_pps, target_pps, motor->accelerate_rate);
     }
 }
 
 // --- 速度处理函数 ---
-static uint16_t stepper_motor_speed_handler(uint16_t current_speed, uint16_t target_speed, uint8_t accelerate_rate)
+static uint16_t stepper_motor_speed_handler(uint16_t current_pps, uint16_t target_pps, uint8_t accelerate_rate)
 {
-    if (current_speed < target_speed) // current speed is slower than target
+    if (current_pps < target_pps) // current speed is slower than target
     {
         // Accelerate
-        if (target_speed - current_speed <= accelerate_rate) 
+        if (target_pps - current_pps <= accelerate_rate) 
         {
-            current_speed = target_speed; // Max speed or clamp
+            current_pps = target_pps; // Max speed or clamp
         }
         else
         {
-            current_speed += accelerate_rate;
+            current_pps += accelerate_rate;
         }
     }
-    else if (current_speed > target_speed) // current speed is faster than target
+    else if (current_pps > target_pps) // current speed is faster than target
     {
         // Decelerate
-        if (current_speed - target_speed <= accelerate_rate) 
+        if (current_pps - target_pps <= accelerate_rate) 
         {
-            current_speed = target_speed; // Min speed or clamp
+            current_pps = target_pps; // Min speed or clamp
         }
         else
         {
-            current_speed -= accelerate_rate;
+            current_pps -= accelerate_rate;
         }
     }
     else
     {
-        current_speed = target_speed;
+        current_pps = target_pps;
     }
 
-    return current_speed;
+    return current_pps;
 }
 
 // --- 电机驱动函数 ---
@@ -545,7 +545,7 @@ static uint32_t timer_neck_handler(void *id)
     
     // 检查是否需要停止定时器
     if(stepper_motor[MOTOR_NECK].state == Motor_State_Stop &&
-       stepper_motor[MOTOR_NECK].current_speed == 0) {
+       stepper_motor[MOTOR_NECK].current_pps == 0) {
         stepper_motor_stop_timer(MOTOR_NECK);
     } else {
         // 动态调整定时器周期
@@ -568,7 +568,7 @@ static uint32_t timer_base_handler(void *id)
     
     // 检查是否需要停止定时器
     if(stepper_motor[MOTOR_BASE].state == Motor_State_Stop &&
-       stepper_motor[MOTOR_BASE].current_speed == 0) {
+       stepper_motor[MOTOR_BASE].current_pps == 0) {
         stepper_motor_stop_timer(MOTOR_BASE);
     } else {
         // 动态调整定时器周期
@@ -639,7 +639,7 @@ void stepper_motor_stop(uint8_t index, bool motor_break, bool emergency)
     stepper_motor[index].motor_break = motor_break;
 
     if(emergency) {
-        stepper_motor[index].current_speed = 0;
+        stepper_motor[index].current_pps = 0;
         stepper_motor[index].accelerate_step = 0;
         stepper_motor[index].state = Motor_State_Stop;
         stepper_motor[index].target_direction = Motor_Direction_Stop;
@@ -651,24 +651,24 @@ void stepper_motor_stop(uint8_t index, bool motor_break, bool emergency)
     }
 }
 
-void stepper_motor_set_direction(uint8_t index, Motor_Direction_t target_direction, uint16_t target_speed)
+void stepper_motor_set_direction(uint8_t index, Motor_Direction_t target_direction, uint16_t target_pps)
 {
     if(index >= MOTOR_COUNT) return;
     
     stepper_motor[index].running_type = Motor_Running_Type_Direction;
     stepper_motor[index].target_direction = target_direction;
-    stepper_motor[index].target_speed = target_speed;
+    stepper_motor[index].target_pps = target_pps;
     
     if(target_direction != Motor_Direction_Stop) {
         stepper_motor_start_timer(index);
     }
 }
 
-void stepper_motor_set_speed_profile(uint8_t index, uint16_t target_speed, uint8_t accel_rate)
+void stepper_motor_set_speed_profile(uint8_t index, uint16_t target_pps, uint8_t accel_rate)
 {
     if(index >= MOTOR_COUNT) return;
     
-    stepper_motor[index].target_speed = target_speed;
+    stepper_motor[index].target_pps = target_pps;
     stepper_motor[index].accelerate_rate = accel_rate;
 }
 
@@ -679,7 +679,7 @@ void stepper_motor_set_sync_target(int nozzle_target, int base_target, uint16_t 
     
     // 设置相同的速度配置
     for(int i = 0; i < MOTOR_COUNT; i++) {
-        stepper_motor[i].target_speed = speed;
+        stepper_motor[i].target_pps = speed;
     }
 }
 
@@ -703,12 +703,12 @@ bool stepper_motor_all_stopped(void)
     return true;
 }
 
-void stepper_motor_set_speed(uint8_t index, uint16_t target_speed, bool immediate)
+void stepper_motor_set_speed(uint8_t index, uint16_t target_pps, bool immediate)
 {
     if(index < MOTOR_COUNT) {
-        stepper_motor[index].target_speed = target_speed;
+        stepper_motor[index].target_pps = target_pps;
         if(immediate) {
-            stepper_motor[index].current_speed = target_speed;
+            stepper_motor[index].current_pps = target_pps;
             stepper_motor[index].accelerate_step = stepper_motor_calc_accel_step(index);
         }
     }
@@ -725,19 +725,19 @@ void stepper_motor_set_acceleration_rate(uint8_t index, uint8_t accel_rate)
 uint16_t stepper_motor_get_current_speed(uint8_t index)
 {
     if(index < MOTOR_COUNT) {
-        return stepper_motor[index].current_speed;
+        return stepper_motor[index].current_pps;
     }
     return 0;
 }
 
 uint16_t stepper_motor_calc_accel_step(uint8_t index)
 {
-    if(stepper_motor[index].current_speed == 0) {
+    if(stepper_motor[index].current_pps == 0) {
         return 0; // No acceleration
-    } else if(stepper_motor[index].current_speed <= MOTOR_MIN_PPS) {
+    } else if(stepper_motor[index].current_pps <= MOTOR_MIN_PPS) {
         return 1; // Minimum speed
     } else {
-        return (stepper_motor[index].current_speed - MOTOR_MIN_PPS + stepper_motor[index].accelerate_rate - 1) / stepper_motor[index].accelerate_rate + 1;
+        return (stepper_motor[index].current_pps - MOTOR_MIN_PPS + stepper_motor[index].accelerate_rate - 1) / stepper_motor[index].accelerate_rate + 1;
     }
 }
 
