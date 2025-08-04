@@ -757,10 +757,28 @@ bool stepper_motor_get_encoder_data(encoder_sampled_data_t *data, int timeout)
 /*********************************************************************** */
 void stepper_motor_move(uint8_t index, Motor_Direction_t target_direction, uint16_t target_pps, bool immediate)
 {
-    UNUSED(index);
-    UNUSED(target_direction);
-    UNUSED(target_pps);
-    UNUSED(immediate);
-
-    return;
+    if(target_direction == Motor_Direction_Stop)
+    {
+        stepper_motor_stop(index, false, immediate);
+    }
+    else if(immediate)
+    {
+        stepper_motor[index].target_pps = target_pps;
+        stepper_motor[index].current_pps = target_pps;
+        stepper_motor[index].target_direction = target_direction;
+        stepper_motor[index].current_direction = target_direction;
+        stepper_motor[index].accelerate_step = stepper_motor_calc_accel_step(index);
+        stepper_motor[index].state = (target_direction == Motor_Direction_Forward) ? Motor_State_Forward : Motor_State_Backward;
+    }
+    else
+    {
+        stepper_motor[index].target_pps = target_pps;
+        stepper_motor[index].target_direction = target_direction;
+        
+        if(stepper_motor[index].state == Motor_State_Stop)
+        {
+            stepper_motor[index].accelerate_step = 0;
+            stepper_motor[index].state = Motor_State_Starting;
+        }
+    }
 }
