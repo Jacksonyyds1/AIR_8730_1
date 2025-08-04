@@ -470,7 +470,7 @@ void fan_controller_example(void)
     fan_speed_set_speed(0, false);
     
     // 或者设置TE模式，直接指定转速
-    // fan_speed_te_set(1800);
+     fan_speed_te_set(1800);
     
     printf("Fan controller initialized\r\n");
 }

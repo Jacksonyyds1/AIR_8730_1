@@ -26,10 +26,10 @@ extern "C" {
 #define MOTOR_NECK_A_MINUS    PA_14
 #define MOTOR_NECK_B_MINUS    PA_15
 
-#define MOTOR_BASE_A_PLUS       PB_21
-#define MOTOR_BASE_B_PLUS       PB_20
-#define MOTOR_BASE_A_MINUS      PB_19
-#define MOTOR_BASE_B_MINUS      PB_18
+#define MOTOR_BASE_A_PLUS       PB_9
+#define MOTOR_BASE_B_PLUS       PB_8
+#define MOTOR_BASE_A_MINUS      PB_7
+#define MOTOR_BASE_B_MINUS      PB_6
 
 // 定时器定义 - 使用RTIM (Real Time Timer)
 #define MOTOR_TIMER_NECK        2
