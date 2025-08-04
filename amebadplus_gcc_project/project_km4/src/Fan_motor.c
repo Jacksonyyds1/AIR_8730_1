@@ -422,8 +422,8 @@ void fan_speed_controller_init(const int *table, int size)
 
     // 初始化FG信号捕获
     gpio_irq_init(&fan_fg_irq, FAN_FG_PIN, fan_fg_isr_handler, 0);
-    gpio_irq_set(&fan_fg_irq, IRQ_RISE, 1); // 上升沿触发
-    gpio_irq_pull_ctrl(&fan_fg_irq, PullUp);
+    gpio_irq_set(&fan_fg_irq, IRQ_RISE, 1); //上升沿触发
+    gpio_irq_pull_ctrl(&fan_fg_irq, PullNone);
     gpio_irq_enable(&fan_fg_irq);
 
     // 初始化超时定时器
@@ -470,7 +470,7 @@ void fan_controller_example(void)
     fan_speed_set_speed(0, false);
     
     // 或者设置TE模式，直接指定转速
-     fan_speed_te_set(1800);
+     //fan_speed_te_set(1800);
     
     printf("Fan controller initialized\r\n");
 }

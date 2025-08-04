@@ -70,7 +70,7 @@ void app_example(void)
    // rtos_time_delay_ms(10000);
      //fan_controller_example();
      //fan_speed_controller_init();
-     test_pwm_output();
+    // test_pwm_output();
     //stepper_motor_stop(MOTOR_BASE, false, true);
     // 2. 初始化任务管理系统
     //task_manager_init();
