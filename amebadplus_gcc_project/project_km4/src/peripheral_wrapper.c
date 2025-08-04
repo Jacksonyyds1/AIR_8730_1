@@ -1,6 +1,6 @@
 #include "peripheral_wrapper.h"
-#include "PeripheralNames.h"  // 只在C文件中包含
-// 添加必要的SDK头文件
+#include "PeripheralNames.h" 
+
 #include "serial_api.h"       // UART相关API
 #include "spi_api.h"          // SPI相关API
 
@@ -73,9 +73,8 @@ int peripheral_init_spi(peripheral_id_t spi_id) {
     return 0;  // 成功返回0
 }
 
-// 方案2：如果你确实需要这些函数，可以自己实现
 #ifdef USE_CUSTOM_INIT_FUNCTIONS
-// 如果确实需要uart_init_with_name函数，可以这样实现：
+
 int uart_init_with_name(UARTName uart_name) {
     serial_t serial_obj;
     serial_init(&serial_obj, uart_name, NC);
@@ -84,7 +83,7 @@ int uart_init_with_name(UARTName uart_name) {
     return 0;
 }
 
-// 如果确实需要spi_init_with_name函数，可以这样实现：
+
 int spi_init_with_name(SPIName spi_name) {
     spi_t spi_obj;
     spi_init(&spi_obj, NC, NC, NC, NC);

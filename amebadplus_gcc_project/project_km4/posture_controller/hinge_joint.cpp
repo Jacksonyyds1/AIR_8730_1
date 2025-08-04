@@ -2,8 +2,8 @@
 #include <algorithm>
 
 #include "logger/logger.h"
-#include "axis_hal/axis_controller.h"
-#include "axis_hal/axis_motion_control.h"
+#include "axis_controller.h"
+#include "axis_motion_control.h"
 #include "hinge_joint.hpp"
 
 namespace PostureController
@@ -184,7 +184,7 @@ float HingeJoint::slove_neck_angle_for_nozzle_elevation(float target_elevation_d
     }
 
     // 计算θ（两个几何解）
-    float theta_rad = std::acosf(cos_theta);
+    float theta_rad = std::acos(cos_theta);
     float theta1_geometric = rad2deg(theta_rad);    // 0-180°范围内的正解
     float theta2_geometric = rad2deg(-theta_rad);   // 负角度解
 

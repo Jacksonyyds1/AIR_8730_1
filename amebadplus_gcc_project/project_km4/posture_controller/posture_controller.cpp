@@ -357,7 +357,7 @@ static void elevation_control_state_process(void)
     GraphicsMath::Vector3 temp_target = target_coord.toVector();
     target_vector = temp_target; */
     
-    Quaternion rotate_axis = Quaternion::fromVectors(current_vector, target_vector);
+    //Quaternion rotate_axis = Quaternion::fromVectors(current_vector, target_vector);
     
 
     if(axis_is_in_position(neck_axis, posture_runtime.neck_angle_rotation_deg, 0.1f))
@@ -394,7 +394,7 @@ static void elevation_control_state_process(void)
     } else {
         neck_success = true; // 角度误差很小，认为已到位
     }
-    
+    if(neck_success){
     // 计算neck轴的实际角速度（估算）
     float neck_velocity = axis_get_current_velocity(neck_axis);
     
@@ -403,6 +403,7 @@ static void elevation_control_state_process(void)
     
     // base轴使用速度控制进行补偿
     axis_move_velocity(base_axis, base_compensation_velocity, true);
+}
 }
 
 float slove_neck_angle_for_nozzle_elevation(float target_elevation_deg)

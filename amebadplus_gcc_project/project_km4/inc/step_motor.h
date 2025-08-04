@@ -6,7 +6,6 @@ extern "C" {
 #endif
 
 #include "ameba_soc.h"
-#include "gpio_api.h"
 #include "os_wrapper.h"
 #include <stdbool.h>
 #include "platform_autoconf.h" 

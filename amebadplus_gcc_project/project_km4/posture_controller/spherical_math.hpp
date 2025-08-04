@@ -36,6 +36,15 @@ SphericalCoord(float32_t* arr)
 SphericalCoord(const SphericalCoord& other)
     : azimuth(other.azimuth), elevation(other.elevation) {}
 
+// 添加赋值操作符 (修复 deprecated copy 警告)
+SphericalCoord& operator=(const SphericalCoord& other) {
+    if (this != &other) {
+        azimuth = other.azimuth;
+        elevation = other.elevation;
+    }
+    return *this;
+}
+
 SphericalCoord(const Vector3& vec) {
     float32_t elevation_rad, azimuth_rad;
     Vector3 normalized = vec.normalized();

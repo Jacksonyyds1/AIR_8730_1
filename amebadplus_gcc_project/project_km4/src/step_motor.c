@@ -1,4 +1,5 @@
 #include "step_motor.h"
+#include "gpio_api.h"
 #include "FreeRTOS.h"
 #include "queue.h"
 #include "task.h"
