@@ -10,6 +10,20 @@ extern "C" {
 #include "gpio_api.h"
 #include "PinNames.h"
 
+// GPIO对象声明
+extern gpio_t wifi_rst_gpio;
+extern gpio_t ionizer_gpio;
+extern gpio_t uv_light_gpio;
+extern gpio_t scd40_power_gpio;
+extern gpio_t sen68_power_gpio;
+extern gpio_t encoder_base_power_gpio;
+extern gpio_t encoder_base_gpio;
+extern gpio_t encoder_neck_power_gpio;
+extern gpio_t encoder_neck_gpio;
+
+#ifdef TEST_PIN 
+extern gpio_t test_gpio;
+#endif
 // 测试引脚定义(可选)
  //#define TEST_PIN       PA_10
 // #define test_pin_on()  gpio_write(&test_gpio, 1)
@@ -56,20 +70,7 @@ extern "C" {
 #define encoder_neck_power_off() gpio_write(&encoder_neck_power_gpio, 0)
 #define encoder_neck_read()      gpio_read(&encoder_neck_gpio)
 
-// GPIO对象声明
-extern gpio_t wifi_rst_gpio;
-extern gpio_t ionizer_gpio;
-extern gpio_t uv_light_gpio;
-extern gpio_t scd40_power_gpio;
-extern gpio_t sen68_power_gpio;
-extern gpio_t encoder_base_power_gpio;
-extern gpio_t encoder_base_gpio;
-extern gpio_t encoder_neck_power_gpio;
-extern gpio_t encoder_neck_gpio;
 
-#ifdef TEST_PIN 
-extern gpio_t test_gpio;
-#endif
 
 /**
  * @brief 初始化所有IO引脚

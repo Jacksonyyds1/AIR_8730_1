@@ -67,6 +67,7 @@ ameba_list_append(private_sources
          lvg_lcd_adapter.c
          peripheral_wrapper.c
          sen68_rtl8721dcm.c
+         sen68.c
          )
 
 # Component private part, user config end

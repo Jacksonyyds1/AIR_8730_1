@@ -24,7 +24,6 @@
  * 4. Direct function calls with built-in timing
  * =============================================================================
  */
-
 // Private global variables
 static sen68_data_t g_sen68_data;
 static sen68_control_t g_sen68_ctrl =
@@ -165,9 +164,9 @@ static uint8_t sen68_send_command_nb(uint16_t command, uint8_t *data, uint16_t d
     }
 
     // Send command and track timing
-    if(i2c3_send_data(SEN68_I2C_ADDRESS, tx_buffer, tx_len) == SEN68_OK)
+    if(sen68_i2c_send_data(SEN68_I2C_ADDRESS, tx_buffer, tx_len) == SEN68_OK)
     {
-        g_command_state.send_time = xTaskGetTickCount();
+        g_command_state.send_time = sen68_get_tick();
         g_command_state.pending = true;
         return SEN68_OK;
     }
@@ -187,7 +186,7 @@ static bool sen68_can_read_response(uint32_t wait_ms)
         return false;
     }
 
-    return (xTaskGetTickCount() - g_command_state.send_time) >= wait_ms;
+    return (sen68_get_tick() - g_command_state.send_time) >= wait_ms;
 }
 
 /**
@@ -275,7 +274,7 @@ static void sen68_handle_initializing_state(void)
 {
     static uint32_t init_start_time = 0;
     static bool command_sent = false;
-    uint32_t tick = xTaskGetTickCount();
+    uint32_t tick = sen68_get_tick();
 
     if(init_start_time == 0)
     {
@@ -297,7 +296,7 @@ static void sen68_handle_initializing_state(void)
         else if(command_sent && sen68_can_read_response(20))
         {
             uint8_t rx_buffer[48];
-            if(i2c3_receive_data(SEN68_I2C_ADDRESS, rx_buffer, 48) == SEN68_OK)
+            if(sen68_i2c_receive_data(SEN68_I2C_ADDRESS, rx_buffer, 48) == SEN68_OK)
             {
                 g_sen68_ctrl.state = SEN68_State_Idle;
                 init_start_time = 0;
@@ -338,7 +337,7 @@ static void sen68_handle_idle_state(void)
         {
             g_sen68_ctrl.state = SEN68_State_Sample_Starting;
             g_sen68_ctrl.sampling = true;
-            g_sen68_ctrl.last_sample_time = xTaskGetTickCount();
+            g_sen68_ctrl.last_sample_time = sen68_get_tick();
             start_command_sent = false;
             sen68_command_completed();
         }
@@ -352,7 +351,7 @@ static void sen68_handle_idle_state(void)
 static void sen68_handle_sample_starting_state(void)
 {
     static uint32_t stabilization_start_time = 0;
-    uint32_t tick = xTaskGetTickCount();
+    uint32_t tick = sen68_get_tick();
 
     if(stabilization_start_time == 0)
     {
@@ -380,7 +379,7 @@ static void sen68_handle_sampling_state(void)
         STEP_READ_DATA
     } sample_step = STEP_CHECK_READY;
 
-    uint32_t tick = xTaskGetTickCount();
+    uint32_t tick = sen68_get_tick();
 
     // Only start new sample cycle after interval has passed
     if(tick - g_sen68_ctrl.last_sample_time >= SEN68_SAMPLE_INTERVAL_MS)
@@ -395,7 +394,7 @@ static void sen68_handle_sampling_state(void)
             else if(sen68_can_read_response(20))
             {
                 uint8_t rx_buffer[3];
-                if(i2c3_receive_data(SEN68_I2C_ADDRESS, rx_buffer, 3) == SEN68_OK)
+                if(sen68_i2c_receive_data(SEN68_I2C_ADDRESS, rx_buffer, 3) == SEN68_OK)
                 {
                     if(sen68_calculate_crc_2bytes(rx_buffer[0], rx_buffer[1]) == rx_buffer[2] && rx_buffer[1] == 1)
                     {
@@ -426,7 +425,7 @@ static void sen68_handle_sampling_state(void)
             else if(sen68_can_read_response(20))
             {
                 uint8_t data_buffer[27];
-                if(i2c3_receive_data(SEN68_I2C_ADDRESS, data_buffer, 27) == SEN68_OK)
+                if(sen68_i2c_receive_data(SEN68_I2C_ADDRESS, data_buffer, 27) == SEN68_OK)
                 {
                     sen68_parse_sample_data(data_buffer);
                     // LOGI("SEN68 Sampled Data: ");
@@ -456,7 +455,7 @@ static void sen68_handle_error_state(void)
 {
     static uint32_t error_recovery_time = 0;
     static bool reset_sent = false;
-    uint32_t tick = xTaskGetTickCount();
+    uint32_t tick = sen68_get_tick();
 
     if(error_recovery_time == 0)
     {
@@ -527,7 +526,7 @@ uint8_t sen68_init(void)
     g_sen68_ctrl.state = SEN68_State_Init;
     g_sen68_ctrl.sampling = false;
     memset(&g_sen68_data, 0, sizeof(g_sen68_data));
-    g_sen68_ctrl.last_sample_time = xTaskGetTickCount();
+    g_sen68_ctrl.last_sample_time = sen68_get_tick();
     g_command_state.pending = false;
 
     return SEN68_OK;
@@ -590,13 +589,13 @@ bool sen68_is_sampling(void)
   */
 void sen68_handler(void)
 {
-    if(user_get_runtime()->on)
-    {
+    //if(user_get_runtime()->on)
+   // {
         sen68_power_on();
         sen68_state_process();
-    }
-    else
-    {
+   // }
+    //else
+    //{
         if(g_sen68_ctrl.sampling)
         {
             sen68_stop_sample();
@@ -606,7 +605,7 @@ void sen68_handler(void)
         g_sen68_ctrl.state = SEN68_State_Init;
         g_command_state.pending = false;
         memset(&g_sen68_data, 0, sizeof(g_sen68_data));
-    }
+   // }
 }
 void sen68_test(void){
 
