@@ -335,7 +335,7 @@ void fan_speed_control_task(void *param)
         }
         
         // 设置PWM输出
-        float duty_ratio = (float)fan_speed_runtime.current_duty / FAN_PWM_MAX_DUTY;
+        float duty_ratio = 1.0f - (float)fan_speed_runtime.current_duty / FAN_PWM_MAX_DUTY;
         pwmout_write(&fan_pwm, duty_ratio);
         
         printf("Target: %d RPM, Current: %d RPM, Duty: %d\r\n", 
@@ -418,7 +418,7 @@ void fan_speed_controller_init(const int *table, int size)
     fan_pwm.period = 0;
     pwmout_init(&fan_pwm, FAN_PWM_PIN);
     pwmout_period_us(&fan_pwm, 1000000 / FAN_PWM_FREQ); // 设置PWM周期
-    pwmout_write(&fan_pwm, 0.0); // 初始占空比为0
+    pwmout_write(&fan_pwm, 1.0); // 初始占空比为0
 
     // 初始化FG信号捕获
     gpio_irq_init(&fan_fg_irq, FAN_FG_PIN, fan_fg_isr_handler, 0);

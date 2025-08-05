@@ -8,9 +8,9 @@
 #define FAN_FG_PULSE_PER_CYCLE  12    // 每转脉冲数
 #define FAN_PWM_FREQ           4000   // PWM频率 4kHz
 #define FAN_PWM_MAX_DUTY       4000   // 最大占空比
-#define PID_OUTPUT_BIAS        600    // PID输出偏置
-#define PID_KP                 0.08f   // PID参数
-#define PID_KI                 0.02f
+#define PID_OUTPUT_BIAS        800    // PID输出偏置
+#define PID_KP                 0.05f   // PID参数
+#define PID_KI                 0.01f
 #define PID_KD                 0.08f
 #define PID_OUTPUT_MAX         (4000 - PID_OUTPUT_BIAS)
 #define PID_OUTPUT_MIN         (0 - PID_OUTPUT_BIAS)
