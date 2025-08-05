@@ -9,6 +9,7 @@
 #include "lvg_lcd_adapter.h"
 #include "timer_api.h"
 #include "Fan_motor.h"
+#include "sen68.h"
 //#include "../absolute_encoder/absolute_encoder.h"
 #include "absolute_encoder.h"
 gtimer_t my_timer1;
@@ -77,8 +78,7 @@ void app_example(void)
     
    // stepper_motor_set_direction(MOTOR_BASE, Motor_Direction_Forward, 800);
    // DisplayLCD_Init();
-
-
+     sen68_test();
     // 3. 启动所有应用任务
    // task_manager_start_all();
    // fw_timer_event_ActiveTimerEvent(1000,test_event_timer_task);

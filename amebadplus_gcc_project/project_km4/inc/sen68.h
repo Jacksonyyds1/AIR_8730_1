@@ -115,6 +115,8 @@ uint8_t sen68_stop_sample(void);
 bool sen68_is_sampling(void);
 void sen68_handler(void);
 
+void sen68_test(void);
+
 #ifdef __cplusplus
 }
 #endif

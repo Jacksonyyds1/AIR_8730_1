@@ -11,7 +11,7 @@ extern "C" {
 #include "PinNames.h"
 
 // 测试引脚定义(可选)
-// #define TEST_PIN       PA_10
+ //#define TEST_PIN       PA_10
 // #define test_pin_on()  gpio_write(&test_gpio, 1)
 // #define test_pin_off() gpio_write(&test_gpio, 0)
 
@@ -38,7 +38,7 @@ extern "C" {
 #define scd40_power_off() gpio_write(&scd40_power_gpio, 0)
 
 // SEN68传感器电源控制引脚
-#define SEN68_POWER_PIN PC_15
+#define SEN68_POWER_PIN PB_10
 #define sen68_power_on()  gpio_write(&sen68_power_gpio, 1)
 #define sen68_power_off() gpio_write(&sen68_power_gpio, 0)
 
@@ -67,7 +67,7 @@ extern gpio_t encoder_base_gpio;
 extern gpio_t encoder_neck_power_gpio;
 extern gpio_t encoder_neck_gpio;
 
-#ifdef TEST_PIN
+#ifdef TEST_PIN 
 extern gpio_t test_gpio;
 #endif
 

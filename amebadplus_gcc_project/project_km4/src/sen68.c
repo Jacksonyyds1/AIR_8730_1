@@ -167,7 +167,7 @@ static uint8_t sen68_send_command_nb(uint16_t command, uint8_t *data, uint16_t d
     // Send command and track timing
     if(i2c3_send_data(SEN68_I2C_ADDRESS, tx_buffer, tx_len) == SEN68_OK)
     {
-        g_command_state.send_time = sys_tick();
+        g_command_state.send_time = xTaskGetTickCount();
         g_command_state.pending = true;
         return SEN68_OK;
     }
@@ -187,7 +187,7 @@ static bool sen68_can_read_response(uint32_t wait_ms)
         return false;
     }
 
-    return (sys_tick() - g_command_state.send_time) >= wait_ms;
+    return (xTaskGetTickCount() - g_command_state.send_time) >= wait_ms;
 }
 
 /**
@@ -275,7 +275,7 @@ static void sen68_handle_initializing_state(void)
 {
     static uint32_t init_start_time = 0;
     static bool command_sent = false;
-    uint32_t tick = sys_tick();
+    uint32_t tick = xTaskGetTickCount();
 
     if(init_start_time == 0)
     {
@@ -338,7 +338,7 @@ static void sen68_handle_idle_state(void)
         {
             g_sen68_ctrl.state = SEN68_State_Sample_Starting;
             g_sen68_ctrl.sampling = true;
-            g_sen68_ctrl.last_sample_time = sys_tick();
+            g_sen68_ctrl.last_sample_time = xTaskGetTickCount();
             start_command_sent = false;
             sen68_command_completed();
         }
@@ -352,7 +352,7 @@ static void sen68_handle_idle_state(void)
 static void sen68_handle_sample_starting_state(void)
 {
     static uint32_t stabilization_start_time = 0;
-    uint32_t tick = sys_tick();
+    uint32_t tick = xTaskGetTickCount();
 
     if(stabilization_start_time == 0)
     {
@@ -380,7 +380,7 @@ static void sen68_handle_sampling_state(void)
         STEP_READ_DATA
     } sample_step = STEP_CHECK_READY;
 
-    uint32_t tick = sys_tick();
+    uint32_t tick = xTaskGetTickCount();
 
     // Only start new sample cycle after interval has passed
     if(tick - g_sen68_ctrl.last_sample_time >= SEN68_SAMPLE_INTERVAL_MS)
@@ -456,7 +456,7 @@ static void sen68_handle_error_state(void)
 {
     static uint32_t error_recovery_time = 0;
     static bool reset_sent = false;
-    uint32_t tick = sys_tick();
+    uint32_t tick = xTaskGetTickCount();
 
     if(error_recovery_time == 0)
     {
@@ -527,7 +527,7 @@ uint8_t sen68_init(void)
     g_sen68_ctrl.state = SEN68_State_Init;
     g_sen68_ctrl.sampling = false;
     memset(&g_sen68_data, 0, sizeof(g_sen68_data));
-    g_sen68_ctrl.last_sample_time = sys_tick();
+    g_sen68_ctrl.last_sample_time = xTaskGetTickCount();
     g_command_state.pending = false;
 
     return SEN68_OK;
@@ -607,4 +607,24 @@ void sen68_handler(void)
         g_command_state.pending = false;
         memset(&g_sen68_data, 0, sizeof(g_sen68_data));
     }
+}
+void sen68_test(void){
+
+    sen68_power_on();
+    rtos_time_delay_ms(1000);
+    printf("SEN68 power status: %d\n", gpio_read(&sen68_power_gpio));
+
+    if(sen68_i2c_init() == SEN68_OK) {
+    printf("I2C init susseful\n");
+    } else {
+    printf("I2C init fail\n");
+    }
+
+    if(sen68_init() == SEN68_OK)
+    {
+        printf("sen68 init susseful\n");
+    }else{
+        printf("sen68 init fail\n");
+    }
+
 }
