@@ -17,7 +17,7 @@ extern "C" {
 #endif
 
 // SEN68 I2C Address (7-bit address 0x6B shifted left by 1)
-#define SEN68_I2C_ADDRESS           (0x6B << 1)
+#define SEN68_I2C_ADDRESS                 0x6B 
 
 // SEN68 Command IDs
 #define SEN68_CMD_START_SAMPLE         0x0021
@@ -50,7 +50,7 @@ extern "C" {
 
 // Timing Constants
 #define SEN68_STARTUP_TIME_MS       1000
-#define SEN68_SAMPLE_INTERVAL_MS 500
+#define SEN68_SAMPLE_INTERVAL_MS 10000
 
 // Command execution times (from datasheet Table 4.8)
 #define SEN68_CMD_EXEC_TIME_DEFAULT         20    // Most commands: 20ms

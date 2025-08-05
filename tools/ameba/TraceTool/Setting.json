@@ -3,7 +3,7 @@
   "CoreGroup": "None",
   "LineConunts": 1100,
   "ShowTimeStamp": true,
-  "COMInformation": "",
+  "COMInformation": "COM22: USB-SERIAL CH340 ",
   "Baudrate": 1500000,
   "EncodingType": "ASCII",
   "DataBits": 8,

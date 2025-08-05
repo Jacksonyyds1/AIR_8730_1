@@ -9,8 +9,13 @@ uint8_t sen68_i2c_init(void)
     if (!i2c_initialized) {
         // 根据你的硬件连接配置I2C引脚
         i2c_init(&sen68_i2c, I2C_SDA_PIN, I2C_SCL_PIN);
-        i2c_frequency(&sen68_i2c, 100000); // 100kHz
+        i2c_frequency(&sen68_i2c, 50000); // 50kHz
+
+        // 3. 添加延时确保I2C初始化完成
+        rtos_time_delay_ms(10);
+
         i2c_initialized = true;
+        printf("I2C initialized at 50KHZ\n");
     }
     return SEN68_OK;
 }

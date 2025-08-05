@@ -665,7 +665,7 @@ void sen68_read_data_simple(void) {
     
     // 检查数据是否准备好
     if(sen68_send_command_nb(SEN68_CMD_GET_DATA_READY, NULL, 0) == SEN68_OK) {
-        rtos_time_delay_ms(20);
+        rtos_time_delay_ms(50);
         uint8_t ready_buffer[3];
         if(sen68_i2c_receive_data(SEN68_I2C_ADDRESS, ready_buffer, 3) == SEN68_OK) {
             if(ready_buffer[1] == 1) {  // 数据准备好了
@@ -698,38 +698,143 @@ void sen68_read_data_simple(void) {
 }
 
 void sen68_test(void){
-
     gpio_init(&sen68_power_gpio, SEN68_POWER_PIN);
     gpio_dir(&sen68_power_gpio, PIN_OUTPUT);
     gpio_mode(&sen68_power_gpio, PullNone);
-     sen68_power_on();
+    sen68_power_on();
     rtos_time_delay_ms(1000);
     printf("SEN68 power status: %d\n", gpio_read(&sen68_power_gpio));
-    
-    if(sen68_i2c_init() != SEN68_OK) {
-        printf("I2C init failed\n");
+
+    if(sen68_i2c_init() == SEN68_OK) {
+        printf("I2C init successful\n");
+    } else {
+        printf("I2C init fail\n");
         return;
     }
-    printf("I2C init successful\n");
-    
-    if(sen68_init() != SEN68_OK) {
-        printf("SEN68 init failed\n");
+
+    if(sen68_init() == SEN68_OK) {
+        printf("SEN68 init successful\n");
+    } else {
+        printf("SEN68 init fail\n");
         return;
     }
-    printf("SEN68 init successful\n");
-    
-    // 2. 读取产品信息
-    rtos_time_delay_ms(1000);  // 等待传感器稳定
-    sen68_test_product_info();
-    
-    // 3. 启动采样
-    rtos_time_delay_ms(1000);
-    sen68_start_sampling();
-    
-    // 4. 等待并读取数据（循环几次）
-    for(int i = 0; i < 10; i++) {
-        rtos_time_delay_ms(2000);  // 等待2秒
-        printf("\n--- Reading %d ---\n", i+1);
-        sen68_read_data_simple();
+
+    // 获取产品信息
+    uint8_t cmd_product[] = {0xD0, 0x14};
+    if(sen68_i2c_send_data(0x6B, cmd_product, 2) == SEN68_OK) {
+        rtos_time_delay_ms(20);
+        uint8_t product_data[48];
+        if(sen68_i2c_receive_data(0x6B, product_data, 48) == SEN68_OK) {
+            printf("Product Name: ");
+            for(int i = 0; i < 32; i++) {
+                if(product_data[i] != 0) printf("%c", product_data[i]);
+            }
+            printf("\n");
+        }
+    }
+
+    // 获取序列号
+    uint8_t cmd_serial[] = {0xD0, 0x33};
+    if(sen68_i2c_send_data(0x6B, cmd_serial, 2) == SEN68_OK) {
+        rtos_time_delay_ms(20);
+        uint8_t serial_data[48];
+        if(sen68_i2c_receive_data(0x6B, serial_data, 48) == SEN68_OK) {
+            printf("Serial Number: ");
+            for(int i = 0; i < 32; i++) {
+                if(serial_data[i] != 0) printf("%c", serial_data[i]);
+            }
+            printf("\n");
+        }
+    }
+
+    // 获取版本信息
+    uint8_t cmd_version[] = {0xD1, 0x00};
+    if(sen68_i2c_send_data(0x6B, cmd_version, 2) == SEN68_OK) {
+        rtos_time_delay_ms(20);
+        uint8_t version_data[12];
+        if(sen68_i2c_receive_data(0x6B, version_data, 12) == SEN68_OK) {
+            printf("Firmware Version: %d.%d\n", version_data[0], version_data[1]);
+            printf("Hardware Version: %d.%d\n", version_data[3], version_data[4]);
+            printf("Protocol Version: %d.%d\n", version_data[6], version_data[7]);
+        }
+    }
+
+    // 启动连续测量
+    printf("Starting SEN68 sampling...\n");
+    uint8_t cmd_start[] = {0x00, 0x21};
+    if(sen68_i2c_send_data(0x6B, cmd_start, 2) == SEN68_OK) {
+        printf("Sampling started successfully\n");
+        
+        // 等待传感器稳定（根据数据手册，需要约1.1秒）
+        rtos_time_delay_ms(60000);  // 等待1.2秒确保数据就绪
+        
+        // 现在开始检查数据
+        for(int i = 1; i <= 10; i++) {
+            printf("\n--- Reading %d ---\n", i);
+            
+            // 检查数据就绪状态
+            uint8_t cmd_ready[] = {0x02, 0x02};
+            if(sen68_i2c_send_data(0x6B, cmd_ready, 2) == SEN68_OK) {
+                rtos_time_delay_ms(20);  // 等待命令执行时间
+                
+                uint8_t ready_data[3];
+                if(sen68_i2c_receive_data(0x6B, ready_data, 3) == SEN68_OK) {
+                    printf("Data Ready Status: 0x%02X 0x%02X 0x%02X\n", 
+                           ready_data[0], ready_data[1], ready_data[2]);
+                    
+                    if(ready_data[1] == 0x01) {
+                        printf("Data is ready! Reading measurement...\n");
+                        
+                        // 读取测量数据
+                        uint8_t cmd_read[] = {0x04, 0x67};
+                        if(sen68_i2c_send_data(0x6B, cmd_read, 2) == SEN68_OK) {
+                            rtos_time_delay_ms(20);
+                            
+                            uint8_t measure_data[27];
+                            if(sen68_i2c_receive_data(0x6B, measure_data, 27) == SEN68_OK) {
+                                // 解析和显示数据
+                                uint16_t pm1 = (measure_data[0] << 8) | measure_data[1];
+                                uint16_t pm2_5 = (measure_data[3] << 8) | measure_data[4];
+                                uint16_t pm4 = (measure_data[6] << 8) | measure_data[7];
+                                uint16_t pm10 = (measure_data[9] << 8) | measure_data[10];
+                                
+                                printf("PM1.0: %.1f μg/m³\n", pm1 / 10.0);
+                                printf("PM2.5: %.1f μg/m³\n", pm2_5 / 10.0);
+                                printf("PM4.0: %.1f μg/m³\n", pm4 / 10.0);
+                                printf("PM10.0: %.1f μg/m³\n", pm10 / 10.0);
+                                
+                                // 温湿度数据
+                                int16_t humi = (measure_data[12] << 8) | measure_data[13];
+                                int16_t temp = (measure_data[15] << 8) | measure_data[16];
+                                printf("Humidity: %.1f %%\n", humi / 100.0);
+                                printf("Temperature: %.1f °C\n", temp / 200.0);
+                                
+                                // VOC和NOx指数
+                                int16_t voc = (measure_data[18] << 8) | measure_data[19];
+                                int16_t nox = (measure_data[21] << 8) | measure_data[22];
+                                printf("VOC Index: %.1f\n", voc / 10.0);
+                                printf("NOx Index: %.1f\n", nox / 10.0);
+                                
+                                // HCHO（甲醛）
+                                uint16_t hcho = (measure_data[24] << 8) | measure_data[25];
+                                printf("HCHO: %.1f ppb\n", hcho / 10.0);
+                                
+                                break; // 成功读取数据后退出循环
+                            } else {
+                                printf("Failed to read measurement data\n");
+                            }
+                        }
+                    } else {
+                        printf("Data not ready yet (status: 0x%02X)\n", ready_data[1]);
+                    }
+                } else {
+                    printf("Failed to read data ready status\n");
+                }
+            }
+            
+            rtos_time_delay_ms(10000);  // 等待2秒再次检查
+        }
+    } else {
+        printf("Failed to start sampling\n");
     }
 }
