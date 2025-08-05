@@ -607,23 +607,129 @@ void sen68_handler(void)
         memset(&g_sen68_data, 0, sizeof(g_sen68_data));
    // }
 }
+/************************************************test**************************************** */
+void sen68_test_product_info(void) {
+    uint8_t rx_buffer[48];
+    
+    // 读取产品名称
+    if(sen68_send_command_nb(SEN68_CMD_GET_PRODUCT_NAME, NULL, 0) == SEN68_OK) {
+        rtos_time_delay_ms(20);  // 等待命令执行
+        if(sen68_i2c_receive_data(SEN68_I2C_ADDRESS, rx_buffer, 48) == SEN68_OK) {
+            printf("Product Name: ");
+            for(int i = 0; i < 48; i += 3) {
+                if(rx_buffer[i] != 0 && rx_buffer[i+1] != 0) {
+                    printf("%c%c", rx_buffer[i], rx_buffer[i+1]);
+                }
+            }
+            printf("\n");
+        }
+    }
+    
+    // 读取序列号
+    rtos_time_delay_ms(100);
+    if(sen68_send_command_nb(SEN68_CMD_GET_SERIAL_NUMBER, NULL, 0) == SEN68_OK) {
+        rtos_time_delay_ms(20);
+        if(sen68_i2c_receive_data(SEN68_I2C_ADDRESS, rx_buffer, 48) == SEN68_OK) {
+            printf("Serial Number: ");
+            for(int i = 0; i < 48; i += 3) {
+                if(rx_buffer[i] != 0 && rx_buffer[i+1] != 0) {
+                    printf("%c%c", rx_buffer[i], rx_buffer[i+1]);
+                }
+            }
+            printf("\n");
+        }
+    }
+    
+    // 读取版本信息
+    rtos_time_delay_ms(100);
+    if(sen68_send_command_nb(SEN68_CMD_GET_VERSION, NULL, 0) == SEN68_OK) {
+        rtos_time_delay_ms(20);
+        if(sen68_i2c_receive_data(SEN68_I2C_ADDRESS, rx_buffer, 12) == SEN68_OK) {
+            printf("Firmware Version: %d.%d\n", rx_buffer[0], rx_buffer[1]);
+            printf("Hardware Version: %d.%d\n", rx_buffer[3], rx_buffer[4]);
+            printf("Protocol Version: %d.%d\n", rx_buffer[6], rx_buffer[7]);
+        }
+    }
+}
+void sen68_start_sampling(void) {
+    printf("Starting SEN68 sampling...\n");
+    
+    if(sen68_start_sample() == SEN68_OK) {
+        printf("Sampling started successfully\n");
+    } else {
+        printf("Failed to start sampling\n");
+    }
+}
+void sen68_read_data_simple(void) {
+    uint8_t rx_buffer[27];
+    
+    // 检查数据是否准备好
+    if(sen68_send_command_nb(SEN68_CMD_GET_DATA_READY, NULL, 0) == SEN68_OK) {
+        rtos_time_delay_ms(20);
+        uint8_t ready_buffer[3];
+        if(sen68_i2c_receive_data(SEN68_I2C_ADDRESS, ready_buffer, 3) == SEN68_OK) {
+            if(ready_buffer[1] == 1) {  // 数据准备好了
+                // 读取采样数据
+                rtos_time_delay_ms(50);
+                if(sen68_send_command_nb(SEN68_CMD_READ_SAMPLED_VALUES, NULL, 0) == SEN68_OK) {
+                    rtos_time_delay_ms(20);
+                    if(sen68_i2c_receive_data(SEN68_I2C_ADDRESS, rx_buffer, 27) == SEN68_OK) {
+                        // 解析并显示数据
+                        sen68_parse_sample_data(rx_buffer);
+                        
+                        printf("=== SEN68 Environmental Data ===\n");
+                        printf("PM1.0:  %.1f μg/m³\n", sen68_get_pm1());
+                        printf("PM2.5:  %.1f μg/m³\n", sen68_get_pm2_5());
+                        printf("PM4.0:  %.1f μg/m³\n", sen68_get_pm4());
+                        printf("PM10.0: %.1f μg/m³\n", sen68_get_pm10());
+                        printf("Humidity: %.1f %%\n", sen68_get_humi());
+                        printf("Temperature: %.1f °C\n", sen68_get_temp());
+                        printf("VOC Index: %.1f\n", sen68_get_voc_idx());
+                        printf("NOx Index: %.1f\n", sen68_get_nox_idx());
+                        printf("HCHO: %.1f ppb\n", sen68_get_hcho());
+                        printf("===============================\n");
+                    }
+                }
+            } else {
+                printf("Data not ready yet\n");
+            }
+        }
+    }
+}
+
 void sen68_test(void){
 
-    sen68_power_on();
+    gpio_init(&sen68_power_gpio, SEN68_POWER_PIN);
+    gpio_dir(&sen68_power_gpio, PIN_OUTPUT);
+    gpio_mode(&sen68_power_gpio, PullNone);
+     sen68_power_on();
     rtos_time_delay_ms(1000);
     printf("SEN68 power status: %d\n", gpio_read(&sen68_power_gpio));
-
-    if(sen68_i2c_init() == SEN68_OK) {
-    printf("I2C init susseful\n");
-    } else {
-    printf("I2C init fail\n");
+    
+    if(sen68_i2c_init() != SEN68_OK) {
+        printf("I2C init failed\n");
+        return;
     }
-
-    if(sen68_init() == SEN68_OK)
-    {
-        printf("sen68 init susseful\n");
-    }else{
-        printf("sen68 init fail\n");
+    printf("I2C init successful\n");
+    
+    if(sen68_init() != SEN68_OK) {
+        printf("SEN68 init failed\n");
+        return;
     }
-
+    printf("SEN68 init successful\n");
+    
+    // 2. 读取产品信息
+    rtos_time_delay_ms(1000);  // 等待传感器稳定
+    sen68_test_product_info();
+    
+    // 3. 启动采样
+    rtos_time_delay_ms(1000);
+    sen68_start_sampling();
+    
+    // 4. 等待并读取数据（循环几次）
+    for(int i = 0; i < 10; i++) {
+        rtos_time_delay_ms(2000);  // 等待2秒
+        printf("\n--- Reading %d ---\n", i+1);
+        sen68_read_data_simple();
+    }
 }

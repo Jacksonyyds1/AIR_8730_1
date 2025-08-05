@@ -115,7 +115,12 @@ uint8_t sen68_stop_sample(void);
 bool sen68_is_sampling(void);
 void sen68_handler(void);
 
+void sen68_test_product_info(void);
+void sen68_start_sampling(void);
+void sen68_read_data_simple(void);
 void sen68_test(void);
+
+
 
 #ifdef __cplusplus
 }

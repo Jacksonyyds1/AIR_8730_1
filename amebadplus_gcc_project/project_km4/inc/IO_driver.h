@@ -34,8 +34,8 @@ extern gpio_t test_gpio;
 #define WIFI_on()       gpio_write(&wifi_rst_gpio, 1)
 #define WIFI_off()      gpio_write(&wifi_rst_gpio, 0)
 
-// 离子发生器控制引脚
-#define IONIZER_PIN     PC_10
+/* // 离子发生器控制引脚
+#define IONIZER_PIN     PB_10
 #define ionizer_on()         gpio_write(&ionizer_gpio, 1)
 #define ionizer_off()        gpio_write(&ionizer_gpio, 0)
 #define ionizer_get_status() gpio_read(&ionizer_gpio)
@@ -49,10 +49,10 @@ extern gpio_t test_gpio;
 // SCD40传感器电源控制引脚
 #define SCD40_POWER_PIN PC_14
 #define scd40_power_on()  gpio_write(&scd40_power_gpio, 1)
-#define scd40_power_off() gpio_write(&scd40_power_gpio, 0)
+#define scd40_power_off() gpio_write(&scd40_power_gpio, 0) */
 
 // SEN68传感器电源控制引脚
-#define SEN68_POWER_PIN PB_10
+#define SEN68_POWER_PIN  PB_10
 #define sen68_power_on()  gpio_write(&sen68_power_gpio, 1)
 #define sen68_power_off() gpio_write(&sen68_power_gpio, 0)
 

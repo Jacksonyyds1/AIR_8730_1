@@ -25,7 +25,7 @@ void io_driver_init(void)
     gpio_dir(&wifi_rst_gpio, PIN_OUTPUT);
     gpio_mode(&wifi_rst_gpio, PullNone);
     
-    // 初始化离子发生器控制引脚 (输出)
+   /*  // 初始化离子发生器控制引脚 (输出)
     gpio_init(&ionizer_gpio, IONIZER_PIN);
     gpio_dir(&ionizer_gpio, PIN_OUTPUT);
     gpio_mode(&ionizer_gpio, PullNone);
@@ -38,7 +38,7 @@ void io_driver_init(void)
     // 初始化SCD40电源控制引脚 (输出)
     gpio_init(&scd40_power_gpio, SCD40_POWER_PIN);
     gpio_dir(&scd40_power_gpio, PIN_OUTPUT);
-    gpio_mode(&scd40_power_gpio, PullNone);
+    gpio_mode(&scd40_power_gpio, PullNone); */
     
     // 初始化SEN68电源控制引脚 (输出)
     gpio_init(&sen68_power_gpio, SEN68_POWER_PIN);
@@ -74,9 +74,9 @@ void io_driver_init(void)
 
     // 设置所有输出引脚的初始状态
     WIFI_off();                    // 确保WIFI初始关闭
-    ionizer_off();                 // 确保离子发生器初始关闭
+   /*  ionizer_off();                 // 确保离子发生器初始关闭
     uv_light_off();               // 确保UV灯初始关闭
-    scd40_power_off();            // 确保SCD40电源初始关闭
+    scd40_power_off();            // 确保SCD40电源初始关闭 */
     sen68_power_off();            // 确保SEN68电源初始关闭
     encoder_base_power_off();     // 确保底座编码器电源初始关闭
     encoder_neck_power_off();     // 确保颈部编码器电源初始关闭
@@ -94,9 +94,9 @@ void io_driver_deinit(void)
     
     // 关闭所有输出设备
     WIFI_off();
-    ionizer_off();
+   /*  ionizer_off();
     uv_light_off();
-    scd40_power_off();
+    scd40_power_off(); */
     sen68_power_off();
     encoder_base_power_off();
     encoder_neck_power_off();

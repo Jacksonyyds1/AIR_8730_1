@@ -68,6 +68,7 @@ ameba_list_append(private_sources
          peripheral_wrapper.c
          sen68_rtl8721dcm.c
          sen68.c
+         IO_driver.c
          )
 
 # Component private part, user config end
