@@ -52,6 +52,7 @@ if(CONFIG_CORE_AS_AP AND CONFIG_SUPPORT_ATCMD)
         atcmd_fan.c  
         atcmd_stepper.c
         atcmd_lcd.c
+        atcmd_sen68.c
     )
     ameba_list_append_if(CONFIG_WLAN private_sources
         atcmd_http.c

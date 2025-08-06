@@ -9,6 +9,7 @@
 #include "atcmd_fan.h"
 #include "atcmd_stepper.h"
 #include "atcmd_lcd.h"
+#include "atcmd_sen68.h"
 
 #ifdef CONFIG_SUPPORT_ATCMD
 
@@ -108,6 +109,7 @@ log_init_t log_init_table[] = {
 	at_fan_init, 
 	at_stepper_init,
 	at_lcd_init,
+	at_sen68_init,
 #ifndef CONFIG_AMEBAD
 	at_otp_init,
 #endif
