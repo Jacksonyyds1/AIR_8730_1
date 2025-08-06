@@ -121,6 +121,9 @@ void sen68_read_data_simple(void);
 void sen68_test(void);
 
 
+void sampleing_sen68_data(void);
+
+
 
 #ifdef __cplusplus
 }

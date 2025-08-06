@@ -607,7 +607,7 @@ void sen68_handler(void)
         memset(&g_sen68_data, 0, sizeof(g_sen68_data));
    // }
 }
-/************************************************test**************************************** */
+/**********************************************test**************************************** */
 void sen68_test_product_info(void) {
     uint8_t rx_buffer[48];
     
@@ -697,6 +697,34 @@ void sen68_read_data_simple(void) {
     }
 }
 
+//******************************************************** */
+// 1. 首先添加调试函数来查看原始数据
+void sen68_debug_raw_data(uint8_t *data, int len, const char *label) {
+    printf("%s (%d bytes): ", label, len);
+    for(int i = 0; i < len; i++) {
+        printf("0x%02X ", data[i]);
+        if((i + 1) % 8 == 0) printf("\n                    ");
+    }
+    printf("\n");
+}
+// 2. CRC验证函数
+uint8_t sen68_calculate_crc_2(uint8_t byte1, uint8_t byte2) {
+    uint8_t crc = 0xFF;  // 初始值
+    uint8_t data[2] = {byte1, byte2};
+    
+    for (int i = 0; i < 2; i++) {
+        crc ^= data[i];
+        for (int bit = 8; bit > 0; --bit) {
+            if (crc & 0x80) {
+                crc = (crc << 1) ^ 0x31;  // 多项式 0x31
+            } else {
+                crc = (crc << 1);
+            }
+        }
+    }
+    return crc;
+}
+
 void sen68_test(void){
     gpio_init(&sen68_power_gpio, SEN68_POWER_PIN);
     gpio_dir(&sen68_power_gpio, PIN_OUTPUT);
@@ -727,7 +755,9 @@ void sen68_test(void){
         if(sen68_i2c_receive_data(0x6B, product_data, 48) == SEN68_OK) {
             printf("Product Name: ");
             for(int i = 0; i < 32; i++) {
-                if(product_data[i] != 0) printf("%c", product_data[i]);
+                if(product_data[i] >= 0x20 && product_data[i] <= 0x7E) {  // 只打印可见ASCII字符
+                    printf("%c", product_data[i]);
+                }
             }
             printf("\n");
         }
@@ -741,7 +771,9 @@ void sen68_test(void){
         if(sen68_i2c_receive_data(0x6B, serial_data, 48) == SEN68_OK) {
             printf("Serial Number: ");
             for(int i = 0; i < 32; i++) {
-                if(serial_data[i] != 0) printf("%c", serial_data[i]);
+                if(serial_data[i] >= 0x20 && serial_data[i] <= 0x7E) {
+                    printf("%c", serial_data[i]);
+                }
             }
             printf("\n");
         }
@@ -765,22 +797,43 @@ void sen68_test(void){
     if(sen68_i2c_send_data(0x6B, cmd_start, 2) == SEN68_OK) {
         printf("Sampling started successfully\n");
         
-        // 等待传感器稳定（根据数据手册，需要约1.1秒）
-        rtos_time_delay_ms(60000);  // 等待1.2秒确保数据就绪
+        // 分阶段等待
+        printf("Waiting for sensors to stabilize...\n");
+        printf("Phase 1: Basic sensor startup (5s)...\n");
+        rtos_time_delay_ms(5000);
         
-        // 现在开始检查数据
-        for(int i = 1; i <= 10; i++) {
-            printf("\n--- Reading %d ---\n", i);
+        printf("Phase 2: Temperature/Humidity stabilization (10s)...\n");
+        rtos_time_delay_ms(10000);
+        
+        printf("Phase 3: VOC/NOx conditioning (20s)...\n");
+        rtos_time_delay_ms(20000);
+        
+        printf("Phase 4: PM sensor warm-up (30s)...\n");
+        rtos_time_delay_ms(30000);
+        
+        printf("All sensors should now be ready. Starting data collection...\n\n");
+        
+        // 连续读取多次数据
+        for(int i = 1; i <= 5; i++) {
+            printf("=== Reading Attempt %d/5 ===\n", i);
             
             // 检查数据就绪状态
             uint8_t cmd_ready[] = {0x02, 0x02};
             if(sen68_i2c_send_data(0x6B, cmd_ready, 2) == SEN68_OK) {
-                rtos_time_delay_ms(20);  // 等待命令执行时间
+                rtos_time_delay_ms(20);
                 
                 uint8_t ready_data[3];
                 if(sen68_i2c_receive_data(0x6B, ready_data, 3) == SEN68_OK) {
-                    printf("Data Ready Status: 0x%02X 0x%02X 0x%02X\n", 
+                    printf("Data Ready Status: 0x%02X 0x%02X 0x%02X", 
                            ready_data[0], ready_data[1], ready_data[2]);
+                    
+                    // 验证CRC
+                    uint8_t expected_crc = sen68_calculate_crc_2(ready_data[0], ready_data[1]);
+                    if(expected_crc == ready_data[2]) {
+                        printf(" [CRC OK]\n");
+                    } else {
+                        printf(" [CRC ERROR - Expected: 0x%02X]\n", expected_crc);
+                    }
                     
                     if(ready_data[1] == 0x01) {
                         printf("Data is ready! Reading measurement...\n");
@@ -792,37 +845,163 @@ void sen68_test(void){
                             
                             uint8_t measure_data[27];
                             if(sen68_i2c_receive_data(0x6B, measure_data, 27) == SEN68_OK) {
-                                // 解析和显示数据
+                                
+                                printf("\n--- Sensor Readings ---\n");
+                                
+                                // 解析数据 (跳过CRC字节)
                                 uint16_t pm1 = (measure_data[0] << 8) | measure_data[1];
                                 uint16_t pm2_5 = (measure_data[3] << 8) | measure_data[4];
                                 uint16_t pm4 = (measure_data[6] << 8) | measure_data[7];
                                 uint16_t pm10 = (measure_data[9] << 8) | measure_data[10];
                                 
-                                printf("PM1.0: %.1f μg/m³\n", pm1 / 10.0);
-                                printf("PM2.5: %.1f μg/m³\n", pm2_5 / 10.0);
-                                printf("PM4.0: %.1f μg/m³\n", pm4 / 10.0);
-                                printf("PM10.0: %.1f μg/m³\n", pm10 / 10.0);
+                                int16_t humi_raw = (measure_data[12] << 8) | measure_data[13];
+                                int16_t temp_raw = (measure_data[15] << 8) | measure_data[16];
                                 
-                                // 温湿度数据
-                                int16_t humi = (measure_data[12] << 8) | measure_data[13];
-                                int16_t temp = (measure_data[15] << 8) | measure_data[16];
-                                printf("Humidity: %.1f %%\n", humi / 100.0);
-                                printf("Temperature: %.1f °C\n", temp / 200.0);
-                                
-                                // VOC和NOx指数
                                 int16_t voc = (measure_data[18] << 8) | measure_data[19];
                                 int16_t nox = (measure_data[21] << 8) | measure_data[22];
-                                printf("VOC Index: %.1f\n", voc / 10.0);
-                                printf("NOx Index: %.1f\n", nox / 10.0);
-                                
-                                // HCHO（甲醛）
                                 uint16_t hcho = (measure_data[24] << 8) | measure_data[25];
-                                printf("HCHO: %.1f ppb\n", hcho / 10.0);
                                 
-                                break; // 成功读取数据后退出循环
+                                // 显示PM数据
+                                printf("Particulate Matter:\n");
+                                if(pm1 == 0xFFFF) {
+                                    printf("  PM1.0:  Not Ready\n");
+                                } else {
+                                    printf("  PM1.0:  %d ug/m3\n", pm1);
+                                }
+                                
+                                if(pm2_5 == 0xFFFF) {
+                                    printf("  PM2.5:  Not Ready\n");
+                                } else {
+                                    printf("  PM2.5:  %d ug/m3\n", pm2_5);
+                                }
+                                
+                                if(pm4 == 0xFFFF) {
+                                    printf("  PM4.0:  Not Ready\n");
+                                } else {
+                                    printf("  PM4.0:  %d ug/m3\n", pm4);
+                                }
+                                
+                                if(pm10 == 0xFFFF) {
+                                    printf("  PM10.0: Not Ready\n");
+                                } else {
+                                    printf("  PM10.0: %d ug/m3\n", pm10);
+                                }
+                                
+                                // 显示环境数据 - 使用整数运算避免浮点问题
+                                printf("\nEnvironmental:\n");
+                                if(humi_raw == 0x7FFF) {
+                                    printf("  Humidity:    Not Ready\n");
+                                } else {
+                                    // 湿度：原始值/100 = 实际百分比
+                                    int humi_integer = humi_raw / 100;
+                                    int humi_decimal = humi_raw % 100;
+                                    printf("  Humidity:    %d.%02d %%\n", humi_integer, humi_decimal);
+                                }
+                                
+                                if(temp_raw == 0x7FFF) {
+                                    printf("  Temperature: Not Ready\n");
+                                } else {
+                                    // 温度：原始值/200 = 实际摄氏度
+                                    // 使用整数运算保持精度
+                                    int temp_integer = temp_raw / 200;
+                                    int temp_decimal = ((temp_raw % 200) * 100) / 200;
+                                    printf("  Temperature: %d.%02d C\n", temp_integer, temp_decimal);
+                                }
+                                
+                                // 显示气体传感器数据
+                                printf("\nGas Sensors:\n");
+                                if(voc == 0x7FFF) {
+                                    printf("  VOC Index:   Not Ready\n");
+                                } else {
+                                    printf("  VOC Index:   %d", voc);
+                                    if(voc == 0) {
+                                        printf(" (Baseline calibrating or excellent air quality)\n");
+                                    } else if(voc <= 100) {
+                                        printf(" (Excellent)\n");
+                                    } else if(voc <= 150) {
+                                        printf(" (Good)\n");
+                                    } else if(voc <= 200) {
+                                        printf(" (Moderate)\n");
+                                    } else if(voc <= 300) {
+                                        printf(" (Poor)\n");
+                                    } else {
+                                        printf(" (Very Poor)\n");
+                                    }
+                                }
+                                
+                                if(nox == 0x7FFF) {
+                                    printf("  NOx Index:   Not Ready (needs 10-11s)\n");
+                                } else {
+                                    printf("  NOx Index:   %d", nox);
+                                    if(nox == 0) {
+                                        printf(" (Baseline calibrating or excellent air quality)\n");
+                                    } else if(nox <= 20) {
+                                        printf(" (Excellent)\n");
+                                    } else if(nox <= 50) {
+                                        printf(" (Good)\n");
+                                    } else if(nox <= 100) {
+                                        printf(" (Moderate)\n");
+                                    } else if(nox <= 200) {
+                                        printf(" (Poor)\n");
+                                    } else {
+                                        printf(" (Very Poor)\n");
+                                    }
+                                }
+                                
+                                if(hcho == 0xFFFF) {
+                                    printf("  HCHO:        Not Ready (needs 60s)\n");
+                                } else {
+                                    printf("  HCHO:        %d ppb", hcho);
+                                    if(hcho <= 30) {
+                                        printf(" (Excellent)\n");
+                                    } else if(hcho <= 100) {
+                                        printf(" (Good)\n");
+                                    } else if(hcho <= 300) {
+                                        printf(" (Moderate)\n");
+                                    } else {
+                                        printf(" (Poor)\n");
+                                    }
+                                }
+                                
+                                // 传感器状态汇总
+                                printf("\n--- Sensor Status Summary ---\n");
+                                int ready_count = 0;
+                                int total_sensors = 9;  // 包括HCHO
+                                
+                                if(pm1 != 0xFFFF) ready_count++;
+                                if(pm2_5 != 0xFFFF) ready_count++;
+                                if(pm4 != 0xFFFF) ready_count++;
+                                if(pm10 != 0xFFFF) ready_count++;
+                                if(humi_raw != 0x7FFF) ready_count++;
+                                if(temp_raw != 0x7FFF) ready_count++;
+                                if(voc != 0x7FFF) ready_count++;
+                                if(nox != 0x7FFF) ready_count++;
+                                if(hcho != 0xFFFF) ready_count++;
+                                
+                                printf("Ready sensors: %d/%d\n", ready_count, total_sensors);
+                                
+                                // 显示原始数据用于调试 - 使用整数运算
+                                printf("\n--- Raw Data (for debugging) ---\n");
+                                printf("Temperature raw: %d (0x%04X) -> %d.%02d C\n", 
+                                       temp_raw, temp_raw, 
+                                       temp_raw/200, ((temp_raw%200)*100)/200);
+                                printf("Humidity raw: %d (0x%04X) -> %d.%02d %%\n", 
+                                       humi_raw, humi_raw, 
+                                       humi_raw/100, humi_raw%100);
+                                printf("VOC raw: %d (0x%04X)\n", voc, voc);
+                                printf("NOx raw: %d (0x%04X)\n", nox, nox);
+                                
+                                // 如果主要传感器工作正常，可以退出循环
+                                if(ready_count >= 6) {
+                                    printf("\nMain sensors are working properly!\n");
+                                    break;
+                                }
+                                
                             } else {
                                 printf("Failed to read measurement data\n");
                             }
+                        } else {
+                            printf("Failed to send read measurement command\n");
                         }
                     } else {
                         printf("Data not ready yet (status: 0x%02X)\n", ready_data[1]);
@@ -830,11 +1009,260 @@ void sen68_test(void){
                 } else {
                     printf("Failed to read data ready status\n");
                 }
+            } else {
+                printf("Failed to send data ready command\n");
             }
             
-            rtos_time_delay_ms(10000);  // 等待2秒再次检查
+            if(i < 5) {
+                printf("\nWaiting 10 seconds before next attempt...\n");
+                rtos_time_delay_ms(10000);
+            }
         }
+        
+        // 停止测量（可选）
+        // uint8_t cmd_stop[] = {0x00, 0x49};
+        // sen68_i2c_send_data(0x6B, cmd_stop, 2);
+        
+        printf("\n=== Test Complete ===\n");
+        printf("Sensor warm-up times:\n");
+        printf("- Temperature/Humidity: Immediate\n");
+        printf("- PM sensors: Up to 30 seconds\n");
+        printf("- VOC sensor: Immediate, but baseline calibration takes 1 hour\n");
+        printf("- NOx sensor: 10-11 seconds\n");
+        printf("- HCHO sensor: 60 seconds\n");
+        
     } else {
         printf("Failed to start sampling\n");
+    }
+}
+
+void sampleing_sen68_data(void)
+{
+     // 启动连续测量
+    printf("Starting SEN68 sampling...\n");
+    uint8_t cmd_start[] = {0x00, 0x21};
+    if(sen68_i2c_send_data(0x6B, cmd_start, 2) == SEN68_OK) {
+        printf("Sampling started successfully\n");
+
+        rtos_time_delay_ms(50);
+        
+        // 连续读取多次数据
+        for(int i = 1; i <= 5; i++) {
+            printf("=== Reading Attempt %d/5 ===\n", i);
+            
+            // 检查数据就绪状态
+            uint8_t cmd_ready[] = {0x02, 0x02};
+            if(sen68_i2c_send_data(0x6B, cmd_ready, 2) == SEN68_OK) {
+                rtos_time_delay_ms(20);
+                
+                uint8_t ready_data[3];
+                if(sen68_i2c_receive_data(0x6B, ready_data, 3) == SEN68_OK) {
+                    printf("Data Ready Status: 0x%02X 0x%02X 0x%02X", 
+                           ready_data[0], ready_data[1], ready_data[2]);
+                    
+                    // 验证CRC
+                    uint8_t expected_crc = sen68_calculate_crc_2(ready_data[0], ready_data[1]);
+                    if(expected_crc == ready_data[2]) {
+                        printf(" [CRC OK]\n");
+                    } else {
+                        printf(" [CRC ERROR - Expected: 0x%02X]\n", expected_crc);
+                    }
+                    
+                    if(ready_data[1] == 0x01) {
+                        printf("Data is ready! Reading measurement...\n");
+                        
+                        // 读取测量数据
+                        uint8_t cmd_read[] = {0x04, 0x67};
+                        if(sen68_i2c_send_data(0x6B, cmd_read, 2) == SEN68_OK) {
+                            rtos_time_delay_ms(20);
+                            
+                            uint8_t measure_data[27];
+                            if(sen68_i2c_receive_data(0x6B, measure_data, 27) == SEN68_OK) {
+                                
+                                printf("\n--- Sensor Readings ---\n");
+                                
+                                // 解析数据 (跳过CRC字节)
+                                uint16_t pm1 = (measure_data[0] << 8) | measure_data[1];
+                                uint16_t pm2_5 = (measure_data[3] << 8) | measure_data[4];
+                                uint16_t pm4 = (measure_data[6] << 8) | measure_data[7];
+                                uint16_t pm10 = (measure_data[9] << 8) | measure_data[10];
+                                
+                                int16_t humi_raw = (measure_data[12] << 8) | measure_data[13];
+                                int16_t temp_raw = (measure_data[15] << 8) | measure_data[16];
+                                
+                                int16_t voc = (measure_data[18] << 8) | measure_data[19];
+                                int16_t nox = (measure_data[21] << 8) | measure_data[22];
+                                uint16_t hcho = (measure_data[24] << 8) | measure_data[25];
+                                
+                                // 显示PM数据
+                                printf("Particulate Matter:\n");
+                                if(pm1 == 0xFFFF) {
+                                    printf("  PM1.0:  Not Ready\n");
+                                } else {
+                                    printf("  PM1.0:  %d ug/m3\n", pm1);
+                                }
+                                
+                                if(pm2_5 == 0xFFFF) {
+                                    printf("  PM2.5:  Not Ready\n");
+                                } else {
+                                    printf("  PM2.5:  %d ug/m3\n", pm2_5);
+                                }
+                                
+                                if(pm4 == 0xFFFF) {
+                                    printf("  PM4.0:  Not Ready\n");
+                                } else {
+                                    printf("  PM4.0:  %d ug/m3\n", pm4);
+                                }
+                                
+                                if(pm10 == 0xFFFF) {
+                                    printf("  PM10.0: Not Ready\n");
+                                } else {
+                                    printf("  PM10.0: %d ug/m3\n", pm10);
+                                }
+                                
+                                // 显示环境数据 - 使用整数运算避免浮点问题
+                                printf("\nEnvironmental:\n");
+                                if(humi_raw == 0x7FFF) {
+                                    printf("  Humidity:    Not Ready\n");
+                                } else {
+                                    // 湿度：原始值/100 = 实际百分比
+                                    int humi_integer = humi_raw / 100;
+                                    int humi_decimal = humi_raw % 100;
+                                    printf("  Humidity:    %d.%02d %%\n", humi_integer, humi_decimal);
+                                }
+                                
+                                if(temp_raw == 0x7FFF) {
+                                    printf("  Temperature: Not Ready\n");
+                                } else {
+                                    // 温度：原始值/200 = 实际摄氏度
+                                    // 使用整数运算保持精度
+                                    int temp_integer = temp_raw / 200;
+                                    int temp_decimal = ((temp_raw % 200) * 100) / 200;
+                                    printf("  Temperature: %d.%02d C\n", temp_integer, temp_decimal);
+                                }
+                                
+                                // 显示气体传感器数据
+                                printf("\nGas Sensors:\n");
+                                if(voc == 0x7FFF) {
+                                    printf("  VOC Index:   Not Ready\n");
+                                } else {
+                                    printf("  VOC Index:   %d", voc);
+                                    if(voc == 0) {
+                                        printf(" (Baseline calibrating or excellent air quality)\n");
+                                    } else if(voc <= 100) {
+                                        printf(" (Excellent)\n");
+                                    } else if(voc <= 150) {
+                                        printf(" (Good)\n");
+                                    } else if(voc <= 200) {
+                                        printf(" (Moderate)\n");
+                                    } else if(voc <= 300) {
+                                        printf(" (Poor)\n");
+                                    } else {
+                                        printf(" (Very Poor)\n");
+                                    }
+                                }
+                                
+                                if(nox == 0x7FFF) {
+                                    printf("  NOx Index:   Not Ready (needs 10-11s)\n");
+                                } else {
+                                    printf("  NOx Index:   %d", nox);
+                                    if(nox == 0) {
+                                        printf(" (Baseline calibrating or excellent air quality)\n");
+                                    } else if(nox <= 20) {
+                                        printf(" (Excellent)\n");
+                                    } else if(nox <= 50) {
+                                        printf(" (Good)\n");
+                                    } else if(nox <= 100) {
+                                        printf(" (Moderate)\n");
+                                    } else if(nox <= 200) {
+                                        printf(" (Poor)\n");
+                                    } else {
+                                        printf(" (Very Poor)\n");
+                                    }
+                                }
+                                
+                                if(hcho == 0xFFFF) {
+                                    printf("  HCHO:        Not Ready (needs 60s)\n");
+                                } else {
+                                    printf("  HCHO:        %d ppb", hcho);
+                                    if(hcho <= 30) {
+                                        printf(" (Excellent)\n");
+                                    } else if(hcho <= 100) {
+                                        printf(" (Good)\n");
+                                    } else if(hcho <= 300) {
+                                        printf(" (Moderate)\n");
+                                    } else {
+                                        printf(" (Poor)\n");
+                                    }
+                                }
+                                
+                                // 传感器状态汇总
+                                printf("\n--- Sensor Status Summary ---\n");
+                                int ready_count = 0;
+                                int total_sensors = 9;  // 包括HCHO
+                                
+                                if(pm1 != 0xFFFF) ready_count++;
+                                if(pm2_5 != 0xFFFF) ready_count++;
+                                if(pm4 != 0xFFFF) ready_count++;
+                                if(pm10 != 0xFFFF) ready_count++;
+                                if(humi_raw != 0x7FFF) ready_count++;
+                                if(temp_raw != 0x7FFF) ready_count++;
+                                if(voc != 0x7FFF) ready_count++;
+                                if(nox != 0x7FFF) ready_count++;
+                                if(hcho != 0xFFFF) ready_count++;
+                                
+                                printf("Ready sensors: %d/%d\n", ready_count, total_sensors);
+                                
+                                // 显示原始数据用于调试 - 使用整数运算
+                                printf("\n--- Raw Data (for debugging) ---\n");
+                                printf("Temperature raw: %d (0x%04X) -> %d.%02d C\n", 
+                                       temp_raw, temp_raw, 
+                                       temp_raw/200, ((temp_raw%200)*100)/200);
+                                printf("Humidity raw: %d (0x%04X) -> %d.%02d %%\n", 
+                                       humi_raw, humi_raw, 
+                                       humi_raw/100, humi_raw%100);
+                                printf("VOC raw: %d (0x%04X)\n", voc, voc);
+                                printf("NOx raw: %d (0x%04X)\n", nox, nox);
+                                
+                                // 如果主要传感器工作正常，可以退出循环
+                                if(ready_count >= 6) {
+                                    printf("\nMain sensors are working properly!\n");
+                                    break;
+                                }
+                                
+                            } else {
+                                printf("Failed to read measurement data\n");
+                            }
+                        } else {
+                            printf("Failed to send read measurement command\n");
+                        }
+                    } else {
+                        printf("Data not ready yet (status: 0x%02X)\n", ready_data[1]);
+                    }
+                } else {
+                    printf("Failed to read data ready status\n");
+                }
+            } else {
+                printf("Failed to send data ready command\n");
+            }
+            
+            if(i < 5) {
+                printf("\nWaiting 10 seconds before next attempt...\n");
+                rtos_time_delay_ms(10000);
+            }
+        }
+        
+        // 停止测量（可选）
+        // uint8_t cmd_stop[] = {0x00, 0x49};
+        // sen68_i2c_send_data(0x6B, cmd_stop, 2);
+        
+        printf("\n=== Test Complete ===\n");
+        printf("Sensor warm-up times:\n");
+        printf("- Temperature/Humidity: Immediate\n");
+        printf("- PM sensors: Up to 30 seconds\n");
+        printf("- VOC sensor: Immediate, but baseline calibration takes 1 hour\n");
+        printf("- NOx sensor: 10-11 seconds\n");
+        printf("- HCHO sensor: 60 seconds\n");
+        
     }
 }
